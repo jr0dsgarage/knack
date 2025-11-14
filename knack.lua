@@ -62,6 +62,15 @@ local function ApplyPosition()
     frame:SetPoint(KnackDB.point, UIParent, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs)
 end
 
+local function SavePosition()
+    local frameX, frameY = frame:GetCenter()
+    local parentX, parentY = UIParent:GetCenter()
+    if not frameX or not parentX then return end
+
+    KnackDB.point, KnackDB.relativePoint = "CENTER", "CENTER"
+    KnackDB.xOfs, KnackDB.yOfs = frameX - parentX, frameY - parentY
+end
+
 -- Create background
 local bg = frame:CreateTexture(nil, "BACKGROUND")
 bg:SetAllPoints(frame)
@@ -98,8 +107,8 @@ end)
 
 frame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
-    local point, _, relativePoint, xOfs, yOfs = self:GetPoint()
-    KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = point, relativePoint, xOfs, yOfs
+    SavePosition()
+    ApplyPosition()
 end)
 
 local function UpdateCursor()
