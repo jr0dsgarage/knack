@@ -57,6 +57,11 @@ frame:RegisterForDrag("LeftButton")
 frame:SetClampedToScreen(true)
 frame:Hide()
 
+local function ApplyPosition()
+    frame:ClearAllPoints()
+    frame:SetPoint(KnackDB.point, UIParent, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs)
+end
+
 -- Create background
 local bg = frame:CreateTexture(nil, "BACKGROUND")
 bg:SetAllPoints(frame)
@@ -106,11 +111,6 @@ local function UpdateCursor()
 end
 
 frame:SetScript("OnUpdate", UpdateCursor)
-
-local function ApplyPosition()
-    frame:ClearAllPoints()
-    frame:SetPoint(KnackDB.point, UIParent, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs)
-end
 
 local function ShouldDisplay()
     if not KnackDB.settings.enabled then
