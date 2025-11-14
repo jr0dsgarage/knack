@@ -147,7 +147,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == addonName then
         -- Apply saved hotkey size
         hotkeyText:SetFont("Fonts\\FRIZQT__.TTF", KnackDB.settings.hotkeySize or 14, "OUTLINE")
-        print("|cff00ff00Knack|r loaded. Hold SHIFT to move the icon.")
+        print("|cff00ff00[knack]|r loaded. Hold SHIFT to move the icon.")
     elseif event == "PLAYER_LOGIN" then
         frame:ClearAllPoints()
         frame:SetPoint(KnackDB.point, UIParent, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs)
@@ -180,7 +180,7 @@ SLASH_KNACK1 = "/knack"
 SlashCmdList["KNACK"] = function(msg)
     if msg == "reset" then
         KnackResetPosition()
-        print("|cff00ff00Knack|r position reset to center.")
+        print("|cff00ff00[knack]|r position reset to center.")
     else
         KnackOpenSettings()
     end

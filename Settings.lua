@@ -23,11 +23,11 @@ end
 -- Create the settings panel
 local function CreateSettingsPanel()
     local panel = CreateFrame("Frame", "KnackSettingsPanel", UIParent)
-    panel.name = "Knack"
+    panel.name = "knack"
     
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText("Knack - Assisted Highlight Display")
+    title:SetText("knack - Assisted Highlight Display")
     
     local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
@@ -36,7 +36,7 @@ local function CreateSettingsPanel()
     -- Enable checkbox
     local enableCheck = CreateFrame("CheckButton", "KnackEnableCheck", panel, "InterfaceOptionsCheckButtonTemplate")
     enableCheck:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -16)
-    enableCheck.Text:SetText("Enable Knack")
+    enableCheck.Text:SetText("Enable knack")
     enableCheck.tooltipText = "Show/hide the assisted combat spell icon"
     enableCheck:SetChecked(KnackDB.settings.enabled)
     enableCheck:SetScript("OnClick", function(self)
@@ -106,7 +106,7 @@ local function CreateSettingsPanel()
     resetButton:SetText("Reset Position")
     resetButton:SetScript("OnClick", function()
         KnackResetPosition()
-        print("|cff00ff00Knack|r position reset to center.")
+        print("|cff00ff00[knack]|r position reset to center.")
     end)
     
     local instructions = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
