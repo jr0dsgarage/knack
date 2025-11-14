@@ -1,21 +1,18 @@
 -- Knack Settings Panel
 local addonName = ...
 
--- Default settings
-local defaults = {
-    enabled = true,
-    onlyWithEnemyTarget = false,
-    showGCD = true,
-    gcdOpacity = 0.7,
-    hotkeySize = 14,
-}
-
--- Initialize settings
+-- Initialize settings with defaults
 function KnackInitializeSettings()
-    KnackDB = KnackDB or {}
-    KnackDB.settings = KnackDB.settings or {}
+    KnackDB = KnackDB or { point = "CENTER", relativePoint = "CENTER", xOfs = 0, yOfs = 0, settings = {} }
     
-    -- Apply defaults for any missing settings
+    local defaults = {
+        enabled = true,
+        onlyWithEnemyTarget = false,
+        showGCD = true,
+        gcdOpacity = 0.7,
+        hotkeySize = 14,
+    }
+    
     for key, value in pairs(defaults) do
         if KnackDB.settings[key] == nil then
             KnackDB.settings[key] = value
@@ -28,12 +25,10 @@ local function CreateSettingsPanel()
     local panel = CreateFrame("Frame", "KnackSettingsPanel", UIParent)
     panel.name = "Knack"
     
-    -- Title
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText("Knack - Assisted Highlight Display")
     
-    -- Subtitle
     local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
     subtitle:SetText("Configure the assisted combat spell display")
@@ -78,12 +73,12 @@ local function CreateSettingsPanel()
     gcdSlider:SetValueStep(0.05)
     gcdSlider:SetObeyStepOnDrag(true)
     gcdSlider:SetWidth(200)
-    KnackGCDOpacitySliderLow:SetText("0%")
-    KnackGCDOpacitySliderHigh:SetText("100%")
-    KnackGCDOpacitySliderText:SetText("GCD Overlay Opacity: " .. math.floor(KnackDB.settings.gcdOpacity * 100) .. "%")
+    _G[gcdSlider:GetName() .. "Low"]:SetText("0%")
+    _G[gcdSlider:GetName() .. "High"]:SetText("100%")
+    _G[gcdSlider:GetName() .. "Text"]:SetText("GCD Overlay Opacity: " .. math.floor(KnackDB.settings.gcdOpacity * 100) .. "%")
     gcdSlider:SetScript("OnValueChanged", function(self, value)
         KnackDB.settings.gcdOpacity = value
-        KnackGCDOpacitySliderText:SetText("GCD Overlay Opacity: " .. math.floor(value * 100) .. "%")
+        _G[self:GetName() .. "Text"]:SetText("GCD Overlay Opacity: " .. math.floor(value * 100) .. "%")
         KnackUpdateGCDOverlay()
     end)
     
@@ -95,12 +90,12 @@ local function CreateSettingsPanel()
     hotkeySlider:SetValueStep(1)
     hotkeySlider:SetObeyStepOnDrag(true)
     hotkeySlider:SetWidth(200)
-    KnackHotkeySizeSliderLow:SetText("14")
-    KnackHotkeySizeSliderHigh:SetText("34")
-    KnackHotkeySizeSliderText:SetText("Hotkey Size: " .. KnackDB.settings.hotkeySize)
+    _G[hotkeySlider:GetName() .. "Low"]:SetText("14")
+    _G[hotkeySlider:GetName() .. "High"]:SetText("34")
+    _G[hotkeySlider:GetName() .. "Text"]:SetText("Hotkey Size: " .. KnackDB.settings.hotkeySize)
     hotkeySlider:SetScript("OnValueChanged", function(self, value)
         KnackDB.settings.hotkeySize = value
-        KnackHotkeySizeSliderText:SetText("Hotkey Size: " .. value)
+        _G[self:GetName() .. "Text"]:SetText("Hotkey Size: " .. value)
         KnackUpdateHotkeySize()
     end)
     
@@ -110,15 +105,10 @@ local function CreateSettingsPanel()
     resetButton:SetSize(150, 22)
     resetButton:SetText("Reset Position")
     resetButton:SetScript("OnClick", function()
-        KnackDB.point = "CENTER"
-        KnackDB.relativePoint = "CENTER"
-        KnackDB.xOfs = 0
-        KnackDB.yOfs = 0
         KnackResetPosition()
         print("|cff00ff00Knack|r position reset to center.")
     end)
     
-    -- Instructions
     local instructions = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     instructions:SetPoint("TOPLEFT", resetButton, "BOTTOMLEFT", 0, -24)
     instructions:SetText("Hold SHIFT and drag the spell icon to reposition it.")
@@ -127,17 +117,27 @@ local function CreateSettingsPanel()
     return panel
 end
 
+
 -- Register settings panel
+local settingsCategory
 local function RegisterSettings()
     local panel = CreateSettingsPanel()
     
-    -- Try new Settings API first (10.0+)
     if Settings and Settings.RegisterCanvasLayoutCategory then
-        local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
-        Settings.RegisterAddOnCategory(category)
-    -- Fall back to old Interface Options (pre-10.0)
+        settingsCategory = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+        Settings.RegisterAddOnCategory(settingsCategory)
     elseif InterfaceOptions_AddCategory then
         InterfaceOptions_AddCategory(panel)
+    end
+end
+
+-- Global function to open settings
+function KnackOpenSettings()
+    if settingsCategory and Settings and Settings.OpenToCategory then
+        Settings.OpenToCategory(settingsCategory:GetID())
+    elseif InterfaceOptionsFrame_OpenToCategory then
+        InterfaceOptionsFrame_OpenToCategory("KnackSettingsPanel")
+        InterfaceOptionsFrame_OpenToCategory("KnackSettingsPanel") -- Call twice for pre-10.0 bug workaround
     end
 end
 

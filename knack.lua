@@ -1,20 +1,8 @@
 -- Knack: Assisted Highlight Spell Display
-local addonName, addon = ...
+local addonName = ...
 
 -- Initialize saved variables
-KnackDB = KnackDB or {
-    point = "CENTER",
-    relativePoint = "CENTER",
-    xOfs = 0,
-    yOfs = 0,
-    settings = {
-        enabled = true,
-        onlyWithEnemyTarget = false,
-        showGCD = true,
-        gcdOpacity = 0.7,
-        hotkeySize = 14,
-    }
-}
+KnackDB = KnackDB or { point = "CENTER", relativePoint = "CENTER", xOfs = 0, yOfs = 0, settings = {} }
 
 -- Create main frame
 local frame = CreateFrame("Frame", "KnackFrame", UIParent)
@@ -55,23 +43,17 @@ if gcdOverlay.SetSwipeColor then
 end
 gcdOverlay:Hide()
 
--- Dragging (only when SHIFT is held)
+-- Dragging
 frame:SetScript("OnDragStart", function(self)
-    if IsShiftKeyDown() then
-        self:StartMoving()
-    end
+    if IsShiftKeyDown() then self:StartMoving() end
 end)
 
 frame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
     local point, _, relativePoint, xOfs, yOfs = self:GetPoint()
-    KnackDB.point = point
-    KnackDB.relativePoint = relativePoint
-    KnackDB.xOfs = xOfs
-    KnackDB.yOfs = yOfs
+    KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = point, relativePoint, xOfs, yOfs
 end)
 
--- Update cursor when shift is held
 frame:SetScript("OnUpdate", function(self)
     if IsShiftKeyDown() and MouseIsOver(self) then
         SetCursor("Interface\\CURSOR\\UI-Cursor-Move")
@@ -80,20 +62,16 @@ frame:SetScript("OnUpdate", function(self)
     end
 end)
 
--- Update the display based on assisted combat
+-- Update the display
 local function UpdateDisplay()
-    -- Check if addon is enabled
     if not KnackDB.settings.enabled then
         frame:Hide()
         return
     end
     
-    -- Check enemy target requirement
-    if KnackDB.settings.onlyWithEnemyTarget then
-        if not UnitExists("target") or not UnitCanAttack("player", "target") or UnitIsDead("target") then
-            frame:Hide()
-            return
-        end
+    if KnackDB.settings.onlyWithEnemyTarget and (not UnitExists("target") or not UnitCanAttack("player", "target") or UnitIsDead("target")) then
+        frame:Hide()
+        return
     end
     
     if not C_AssistedCombat or not C_AssistedCombat.GetNextCastSpell then
@@ -102,7 +80,6 @@ local function UpdateDisplay()
     end
     
     local success, spellID = pcall(C_AssistedCombat.GetNextCastSpell, true)
-    
     if not success or not spellID or spellID == 0 then
         frame:Hide()
         return
@@ -116,37 +93,30 @@ local function UpdateDisplay()
     
     icon:SetTexture(spellInfo.iconID)
     
-    -- Find keybind
+    -- Find keybind and check range
     local hotkey = ""
+    local inRange = true
     local slots = C_ActionBar.FindSpellActionButtons(spellID)
     if slots and #slots > 0 then
         local slot = slots[1]
-        if slot <= 12 then
-            hotkey = GetBindingKey("ACTIONBUTTON" .. slot)
-        elseif slot <= 24 then
-            hotkey = GetBindingKey("MULTIACTIONBAR1BUTTON" .. (slot - 12))
-        elseif slot <= 36 then
-            hotkey = GetBindingKey("MULTIACTIONBAR2BUTTON" .. (slot - 24))
-        elseif slot <= 48 then
-            hotkey = GetBindingKey("MULTIACTIONBAR3BUTTON" .. (slot - 36))
-        elseif slot <= 60 then
-            hotkey = GetBindingKey("MULTIACTIONBAR4BUTTON" .. (slot - 48))
-        end
-    end
-    
-    -- Format hotkey
-    if hotkey then
+        local actionBar = slot <= 12 and "ACTIONBUTTON" or slot <= 24 and "MULTIACTIONBAR1BUTTON" or slot <= 36 and "MULTIACTIONBAR2BUTTON" or slot <= 48 and "MULTIACTIONBAR3BUTTON" or "MULTIACTIONBAR4BUTTON"
+        local buttonNum = slot <= 12 and slot or (slot - 12) % 12
+        if buttonNum == 0 then buttonNum = 12 end
+        hotkey = GetBindingKey(actionBar .. buttonNum) or ""
         hotkey = hotkey:gsub("SHIFT%-", "S-"):gsub("CTRL%-", "C-"):gsub("ALT%-", "A-"):gsub("BUTTON", "M")
+        
+        -- Check if spell is in range
+        inRange = C_Spell.IsSpellInRange(spellID, "target") ~= false
     end
     
-    hotkeyText:SetText(hotkey or "")
+    hotkeyText:SetText(hotkey)
+    hotkeyText:SetTextColor(inRange and 1 or 0.8, inRange and 1 or 0.1, inRange and 1 or 0.1, 1)
     
-    -- Update GCD overlay - Cooldown frame handles its own visibility
+    -- Update GCD overlay
     if KnackDB.settings.showGCD then
-        local spellCooldown = C_Spell.GetSpellCooldown(61304) -- GCD spell ID
+        local spellCooldown = C_Spell.GetSpellCooldown(61304)
         if spellCooldown and spellCooldown.startTime and spellCooldown.duration then
             gcdOverlay:SetCooldown(spellCooldown.startTime, spellCooldown.duration)
-            -- Control opacity through the swipe color
             if gcdOverlay.SetSwipeColor then
                 gcdOverlay:SetSwipeColor(0, 0, 0, KnackDB.settings.gcdOpacity)
             end
@@ -173,8 +143,10 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 
-eventFrame:SetScript("OnEvent", function(self, event, ...)
-    if event == "ADDON_LOADED" and ... == addonName then
+eventFrame:SetScript("OnEvent", function(self, event, arg1)
+    if event == "ADDON_LOADED" and arg1 == addonName then
+        -- Apply saved hotkey size
+        hotkeyText:SetFont("Fonts\\FRIZQT__.TTF", KnackDB.settings.hotkeySize or 14, "OUTLINE")
         print("|cff00ff00Knack|r loaded. Hold SHIFT to move the icon.")
     elseif event == "PLAYER_LOGIN" then
         frame:ClearAllPoints()
@@ -186,19 +158,11 @@ end)
 
 -- Global functions for settings panel
 function KnackUpdateVisibility()
-    if KnackDB.settings.enabled then
-        UpdateDisplay()
-    else
-        frame:Hide()
-    end
+    if KnackDB.settings.enabled then UpdateDisplay() else frame:Hide() end
 end
 
 function KnackUpdateGCDOverlay()
-    if KnackDB.settings.showGCD then
-        gcdOverlay:Show()
-    else
-        gcdOverlay:Hide()
-    end
+    if KnackDB.settings.showGCD then gcdOverlay:Show() else gcdOverlay:Hide() end
 end
 
 function KnackUpdateHotkeySize()
@@ -206,6 +170,7 @@ function KnackUpdateHotkeySize()
 end
 
 function KnackResetPosition()
+    KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = "CENTER", "CENTER", 0, 0
     frame:ClearAllPoints()
     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 end
@@ -214,16 +179,9 @@ end
 SLASH_KNACK1 = "/knack"
 SlashCmdList["KNACK"] = function(msg)
     if msg == "reset" then
-        KnackDB.point = "CENTER"
-        KnackDB.relativePoint = "CENTER"
-        KnackDB.xOfs = 0
-        KnackDB.yOfs = 0
-        frame:ClearAllPoints()
-        frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        KnackResetPosition()
         print("|cff00ff00Knack|r position reset to center.")
     else
-        print("|cff00ff00Knack|r - Displays assisted highlight spells")
-        print("  /knack reset - Reset position to center")
-        print("  Hold SHIFT and drag to move the icon")
+        KnackOpenSettings()
     end
 end
