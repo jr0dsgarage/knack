@@ -6,10 +6,10 @@ local GCD_SPELL_ID = 61304
 local SCAN_INTERVAL = 0.1
 
 local bindingRanges = {
-    { min = 61, max = 72, prefix = "MULTIACTIONBAR1BUTTON" }, -- Bottom Left
-    { min = 49, max = 60, prefix = "MULTIACTIONBAR2BUTTON" }, -- Bottom Right
-    { min = 37, max = 48, prefix = "MULTIACTIONBAR3BUTTON" }, -- Right 1
-    { min = 25, max = 36, prefix = "MULTIACTIONBAR4BUTTON" }, -- Right 2
+    { 61, 72, "MULTIACTIONBAR1BUTTON" }, -- Bottom Left
+    { 49, 60, "MULTIACTIONBAR2BUTTON" }, -- Bottom Right
+    { 37, 48, "MULTIACTIONBAR3BUTTON" }, -- Right 1
+    { 25, 36, "MULTIACTIONBAR4BUTTON" }, -- Right 2
 }
 
 local function GetBindingNameForSlot(slot)
@@ -17,8 +17,9 @@ local function GetBindingNameForSlot(slot)
 
     local button = ((slot - 1) % 12) + 1
     for _, range in ipairs(bindingRanges) do
-        if slot >= range.min and slot <= range.max then
-            return range.prefix .. button
+        local minSlot, maxSlot, prefix = range[1], range[2], range[3]
+        if slot >= minSlot and slot <= maxSlot then
+            return prefix .. button
         end
     end
 
@@ -28,11 +29,13 @@ end
 local function SelectBinding(binding1, binding2)
     if not binding1 then return binding2 end
     if not binding2 then return binding1 end
-    local firstHasMod = binding1:find("-") ~= nil
-    local secondHasMod = binding2:find("-") ~= nil
-    if not firstHasMod and secondHasMod then
+
+    if binding1:find("-") then
+        return binding1
+    elseif binding2:find("-") then
         return binding2
     end
+
     return binding1
 end
 
