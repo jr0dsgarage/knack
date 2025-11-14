@@ -1,0 +1,9 @@
+## Interface: 120000
+## Title: Knack
+## Notes: Displays the next assisted highlight spell with its hotkey
+## Author: Your Name
+## Version: 1.0.0
+## SavedVariables: KnackDB
+
+Settings.lua
+knack.lua

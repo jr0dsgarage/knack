@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# WoW saved variables (user-specific)
+*.lua.bak
+
+# Development
+JustAC/
