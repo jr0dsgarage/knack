@@ -5,38 +5,18 @@ local MOVE_CURSOR = "Interface\\CURSOR\\UI-Cursor-Move"
 local GCD_SPELL_ID = 61304
 local SCAN_INTERVAL = 0.1
 
-local bindingRanges = {
-    { 61, 72, "MULTIACTIONBAR1BUTTON" }, -- Bottom Left
-    { 49, 60, "MULTIACTIONBAR2BUTTON" }, -- Bottom Right
-    { 37, 48, "MULTIACTIONBAR3BUTTON" }, -- Right 1
-    { 25, 36, "MULTIACTIONBAR4BUTTON" }, -- Right 2
-}
-
 local function GetBindingNameForSlot(slot)
     if not slot then return nil end
-
     local button = ((slot - 1) % 12) + 1
-    for _, range in ipairs(bindingRanges) do
-        local minSlot, maxSlot, prefix = range[1], range[2], range[3]
-        if slot >= minSlot and slot <= maxSlot then
-            return prefix .. button
-        end
+    local ranges = {{61, "MULTIACTIONBAR1BUTTON"}, {49, "MULTIACTIONBAR2BUTTON"}, {37, "MULTIACTIONBAR3BUTTON"}, {25, "MULTIACTIONBAR4BUTTON"}}
+    for _, r in ipairs(ranges) do
+        if slot >= r[1] and slot < r[1] + 12 then return r[2] .. button end
     end
-
     return "ACTIONBUTTON" .. button
 end
 
-local function SelectBinding(binding1, binding2)
-    if not binding1 then return binding2 end
-    if not binding2 then return binding1 end
-
-    if binding1:find("-") then
-        return binding1
-    elseif binding2:find("-") then
-        return binding2
-    end
-
-    return binding1
+local function SelectBinding(b1, b2)
+    return b1 and b1:find("-") and b1 or b2 and b2:find("-") and b2 or b1 or b2
 end
 
 local function FormatBinding(binding)
@@ -63,12 +43,10 @@ local function ApplyPosition()
 end
 
 local function SavePosition()
-    local frameX, frameY = frame:GetCenter()
-    local parentX, parentY = UIParent:GetCenter()
-    if not frameX or not parentX then return end
-
-    KnackDB.point, KnackDB.relativePoint = "CENTER", "CENTER"
-    KnackDB.xOfs, KnackDB.yOfs = frameX - parentX, frameY - parentY
+    local fx, fy, px, py = frame:GetCenter(), UIParent:GetCenter()
+    if fx and px then
+        KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = "CENTER", "CENTER", fx - px, fy - py
+    end
 end
 
 -- Create background
@@ -101,54 +79,21 @@ end
 gcdOverlay:Hide()
 
 -- Dragging
-frame:SetScript("OnDragStart", function(self)
-    if IsShiftKeyDown() then self:StartMoving() end
-end)
+frame:SetScript("OnDragStart", function(self) if IsShiftKeyDown() then self:StartMoving() end end)
+frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() SavePosition() ApplyPosition() end)
 
-frame:SetScript("OnDragStop", function(self)
-    self:StopMovingOrSizing()
-    SavePosition()
-    ApplyPosition()
-end)
-
-local function UpdateCursor()
-    if IsShiftKeyDown() and MouseIsOver(frame) then
-        SetCursor(MOVE_CURSOR)
-    else
-        ResetCursor()
-    end
-end
-
-frame:SetScript("OnUpdate", UpdateCursor)
+frame:SetScript("OnUpdate", function() (IsShiftKeyDown() and MouseIsOver(frame) and SetCursor or ResetCursor)(MOVE_CURSOR) end)
 
 local function ShouldDisplay()
-    if not KnackDB.settings.enabled then
-        return false
-    end
-
-    if KnackDB.settings.onlyWithEnemyTarget and (not UnitExists("target") or not UnitCanAttack("player", "target") or UnitIsDead("target")) then
-        return false
-    end
-
-    return C_AssistedCombat and C_AssistedCombat.GetNextCastSpell
+    return KnackDB.settings.enabled and (not KnackDB.settings.onlyWithEnemyTarget or (UnitExists("target") and UnitCanAttack("player", "target") and not UnitIsDead("target"))) and C_AssistedCombat and C_AssistedCombat.GetNextCastSpell
 end
 
 local function GetHotkeyInfo(spellID)
     local slots = C_ActionBar.FindSpellActionButtons(spellID)
-    if not slots or not slots[1] then
-        return "", true
-    end
-
+    if not slots or not slots[1] then return "", true end
     local bindingName = GetBindingNameForSlot(slots[1])
-    local bindingPrimary, bindingSecondary
-    if bindingName then
-        bindingPrimary, bindingSecondary = GetBindingKey(bindingName)
-    end
-    local binding = SelectBinding(bindingPrimary, bindingSecondary)
-    local formatted = FormatBinding(binding)
-    local inRange = C_Spell.IsSpellInRange(spellID, "target") ~= false
-
-    return formatted, inRange
+    local binding = bindingName and SelectBinding(GetBindingKey(bindingName))
+    return FormatBinding(binding), C_Spell.IsSpellInRange(spellID, "target") ~= false
 end
 
 -- Update the display
@@ -219,22 +164,10 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
 end)
 
 -- Global functions for settings panel
-function KnackUpdateVisibility()
-    if KnackDB.settings.enabled then UpdateDisplay() else frame:Hide() end
-end
-
-function KnackUpdateGCDOverlay()
-    if KnackDB.settings.showGCD then gcdOverlay:Show() else gcdOverlay:Hide() end
-end
-
-function KnackUpdateHotkeySize()
-    hotkeyText:SetFont(FONT_PATH, KnackDB.settings.hotkeySize, "OUTLINE")
-end
-
-function KnackResetPosition()
-    KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = "CENTER", "CENTER", 0, 0
-    ApplyPosition()
-end
+function KnackUpdateVisibility() if KnackDB.settings.enabled then UpdateDisplay() else frame:Hide() end end
+function KnackUpdateGCDOverlay() (KnackDB.settings.showGCD and gcdOverlay.Show or gcdOverlay.Hide)(gcdOverlay) end
+function KnackUpdateHotkeySize() hotkeyText:SetFont(FONT_PATH, KnackDB.settings.hotkeySize, "OUTLINE") end
+function KnackResetPosition() KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = "CENTER", "CENTER", 0, 0 ApplyPosition() end
 
 -- Slash command
 SLASH_KNACK1 = "/knack"
