@@ -4,7 +4,7 @@ local addonName = ...
 -- Initialize settings with defaults
 function KnackInitializeSettings()
     KnackDB = KnackDB or { point = "CENTER", relativePoint = "CENTER", xOfs = 0, yOfs = 0, settings = {} }
-    local defaults = {enabled = true, onlyWithEnemyTarget = false, showGCD = true, gcdOpacity = 0.7, hotkeySize = 14}
+    local defaults = {enabled = true, onlyWithEnemyTarget = false, showGCD = true, gcdOpacity = 0.7, hotkeySize = 14, iconSize = 64}
     for key, value in pairs(defaults) do
         if KnackDB.settings[key] == nil then KnackDB.settings[key] = value end
     end
@@ -70,8 +70,12 @@ local function CreateSettingsPanel()
         function(v) return "Hotkey Size: " .. v end,
         function(v) KnackDB.settings.hotkeySize = v KnackUpdateHotkeySize() end)
     
+    local iconSizeSlider = CreateSlider("KnackIconSizeSlider", hotkeySlider, -32, 32, 128, KnackDB.settings.iconSize, "32", "128",
+        function(v) return "Icon Size: " .. v end,
+        function(v) KnackDB.settings.iconSize = v KnackUpdateIconSize() end)
+    
     local resetButton = CreateFrame("Button", "KnackResetButton", panel, "UIPanelButtonTemplate")
-    resetButton:SetPoint("TOPLEFT", hotkeySlider, "BOTTOMLEFT", -16, -24)
+    resetButton:SetPoint("TOPLEFT", iconSizeSlider, "BOTTOMLEFT", -16, -24)
     resetButton:SetSize(150, 22)
     resetButton:SetText("Reset Position")
     resetButton:SetScript("OnClick", function() KnackResetPosition() print("|cff00ff00[knack]|r position reset to center.") end)

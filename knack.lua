@@ -29,7 +29,8 @@ KnackDB = KnackDB or { point = "CENTER", relativePoint = "CENTER", xOfs = 0, yOf
 
 -- Create main frame
 local frame = CreateFrame("Frame", "KnackFrame", UIParent)
-frame:SetSize(64, 64)
+local frameSize = KnackDB.settings.iconSize or 64
+frame:SetSize(frameSize, frameSize)
 frame:SetPoint(KnackDB.point, UIParent, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs)
 frame:SetMovable(true)
 frame:EnableMouse(true)
@@ -43,8 +44,9 @@ local function ApplyPosition()
 end
 
 local function SavePosition()
-    local fx, fy, px, py = frame:GetCenter(), UIParent:GetCenter()
-    if fx and px then
+    local fx, fy = frame:GetCenter()
+    local px, py = UIParent:GetCenter()
+    if fx and fy and px and py then
         KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = "CENTER", "CENTER", fx - px, fy - py
     end
 end
@@ -57,7 +59,8 @@ bg:SetColorTexture(0, 0, 0, 0.5)
 -- Create spell icon
 local icon = frame:CreateTexture(nil, "ARTWORK")
 icon:SetPoint("CENTER")
-icon:SetSize(60, 60)
+local iconSize = (KnackDB.settings.iconSize or 64) - 4
+icon:SetSize(iconSize, iconSize)
 icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
 -- Create hotkey text
@@ -83,6 +86,16 @@ frame:SetScript("OnDragStart", function(self) if IsShiftKeyDown() then self:Star
 frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() SavePosition() ApplyPosition() end)
 
 frame:SetScript("OnUpdate", function() (IsShiftKeyDown() and MouseIsOver(frame) and SetCursor or ResetCursor)(MOVE_CURSOR) end)
+
+-- Mouse wheel scaling
+frame:SetScript("OnMouseWheel", function(self, delta)
+    if IsShiftKeyDown() then
+        local newSize = math.max(32, math.min(128, KnackDB.settings.iconSize + (delta * 4)))
+        KnackDB.settings.iconSize = newSize
+        KnackUpdateIconSize()
+    end
+end)
+frame:EnableMouseWheel(true)
 
 local function ShouldDisplay()
     return KnackDB.settings.enabled and (not KnackDB.settings.onlyWithEnemyTarget or (UnitExists("target") and UnitCanAttack("player", "target") and not UnitIsDead("target"))) and C_AssistedCombat and C_AssistedCombat.GetNextCastSpell
@@ -167,6 +180,7 @@ end)
 function KnackUpdateVisibility() if KnackDB.settings.enabled then UpdateDisplay() else frame:Hide() end end
 function KnackUpdateGCDOverlay() (KnackDB.settings.showGCD and gcdOverlay.Show or gcdOverlay.Hide)(gcdOverlay) end
 function KnackUpdateHotkeySize() hotkeyText:SetFont(FONT_PATH, KnackDB.settings.hotkeySize, "OUTLINE") end
+function KnackUpdateIconSize() local size = KnackDB.settings.iconSize frame:SetSize(size, size) icon:SetSize(size - 4, size - 4) end
 function KnackResetPosition() KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = "CENTER", "CENTER", 0, 0 ApplyPosition() end
 
 -- Slash command
