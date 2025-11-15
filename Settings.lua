@@ -4,7 +4,7 @@ local addonName = ...
 -- Initialize settings with defaults
 function KnackInitializeSettings()
     KnackDB = KnackDB or { point = "CENTER", relativePoint = "CENTER", xOfs = 0, yOfs = 0, settings = {} }
-    local defaults = {enabled = true, onlyWithEnemyTarget = false, showGCD = true, gcdOpacity = 0.7, hotkeySize = 14, iconSize = 64}
+    local defaults = {enabled = true, onlyWithEnemyTarget = false, showGCD = true, gcdOpacity = 0.7, hotkeySize = 14, iconSize = 64, showTooltip = true, hideTooltipInCombat = false}
     for key, value in pairs(defaults) do
         if KnackDB.settings[key] == nil then KnackDB.settings[key] = value end
     end
@@ -47,6 +47,17 @@ local function CreateSettingsPanel()
         KnackUpdateGCDOverlay()
     end)
     
+    local tooltipCheck = CreateCheck("KnackTooltipCheck", gcdCheck, -8, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "showTooltip", function(self)
+        KnackDB.settings.showTooltip = self:GetChecked()
+        local hideCheck = _G["KnackHideTooltipInCombatCheck"]
+        if hideCheck then hideCheck:SetEnabled(self:GetChecked()) end
+    end)
+    
+    local hideTooltipInCombatCheck = CreateCheck("KnackHideTooltipInCombatCheck", tooltipCheck, -8, "    Hide tooltip in combat", "Only show tooltip when out of combat", "hideTooltipInCombat", function(self)
+        KnackDB.settings.hideTooltipInCombat = self:GetChecked()
+    end)
+    hideTooltipInCombatCheck:SetEnabled(KnackDB.settings.showTooltip)
+    
     local function CreateSlider(name, anchor, offset, min, max, value, lowText, highText, labelFormat, callback)
         local slider = CreateFrame("Slider", name, panel, "OptionsSliderTemplate")
         slider:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", offset > -20 and 16 or 0, offset)
@@ -62,7 +73,7 @@ local function CreateSettingsPanel()
         return slider
     end
     
-    local gcdSlider = CreateSlider("KnackGCDOpacitySlider", gcdCheck, -24, 0, 1, KnackDB.settings.gcdOpacity, "0%", "100%", 
+    local gcdSlider = CreateSlider("KnackGCDOpacitySlider", hideTooltipInCombatCheck, -24, 0, 1, KnackDB.settings.gcdOpacity, "0%", "100%", 
         function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
         function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end)
     

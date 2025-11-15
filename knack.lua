@@ -82,20 +82,40 @@ end
 gcdOverlay:Hide()
 
 -- Dragging
-frame:SetScript("OnDragStart", function(self) if IsShiftKeyDown() then self:StartMoving() end end)
+frame:SetScript("OnDragStart", function(self) if IsShiftKeyDown() and not InCombatLockdown() then self:StartMoving() end end)
 frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() SavePosition() ApplyPosition() end)
 
-frame:SetScript("OnUpdate", function() (IsShiftKeyDown() and MouseIsOver(frame) and SetCursor or ResetCursor)(MOVE_CURSOR) end)
+frame:SetScript("OnUpdate", function() (IsShiftKeyDown() and not InCombatLockdown() and MouseIsOver(frame) and SetCursor or ResetCursor)(MOVE_CURSOR) end)
 
 -- Mouse wheel scaling
 frame:SetScript("OnMouseWheel", function(self, delta)
-    if IsShiftKeyDown() then
+    if IsShiftKeyDown() and not InCombatLockdown() then
         local newSize = math.max(32, math.min(128, KnackDB.settings.iconSize + (delta * 4)))
         KnackDB.settings.iconSize = newSize
         KnackUpdateIconSize()
     end
 end)
 frame:EnableMouseWheel(true)
+
+-- Tooltip
+local currentSpellID
+
+frame:SetScript("OnEnter", function(self)
+    if KnackDB.settings.showTooltip and currentSpellID then
+        if not KnackDB.settings.hideTooltipInCombat or not InCombatLockdown() then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:ClearLines()
+            -- Some spells have protected data; ignore errors when setting tooltip
+            xpcall(function()
+                GameTooltip:SetSpellByID(currentSpellID)
+                GameTooltip:Show()
+            end, function() end)
+        end
+    end
+end)
+frame:SetScript("OnLeave", function(self)
+    GameTooltip:Hide()
+end)
 
 local function ShouldDisplay()
     return KnackDB.settings.enabled and (not KnackDB.settings.onlyWithEnemyTarget or (UnitExists("target") and UnitCanAttack("player", "target") and not UnitIsDead("target"))) and C_AssistedCombat and C_AssistedCombat.GetNextCastSpell
@@ -113,21 +133,25 @@ end
 local function UpdateDisplay()
     if not ShouldDisplay() then
         frame:Hide()
+        currentSpellID = nil
         return
     end
 
     local success, spellID = pcall(C_AssistedCombat.GetNextCastSpell, true)
     if not success or not spellID or spellID == 0 then
         frame:Hide()
+        currentSpellID = nil
         return
     end
 
     local spellInfo = C_Spell.GetSpellInfo(spellID)
     if not spellInfo then
         frame:Hide()
+        currentSpellID = nil
         return
     end
 
+    currentSpellID = spellID
     icon:SetTexture(spellInfo.iconID)
 
     local hotkey, inRange = GetHotkeyInfo(spellID)
