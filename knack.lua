@@ -104,15 +104,12 @@ frame:SetScript("OnEnter", function(self)
     if KnackDB.settings.showTooltip and currentSpellID then
         if not KnackDB.settings.hideTooltipInCombat or not InCombatLockdown() then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:ClearLines()
-            -- Some spells have protected data; ignore errors when setting tooltip
-            xpcall(function()
-                GameTooltip:SetSpellByID(currentSpellID)
-                GameTooltip:Show()
-            end, function() end)
+            GameTooltip:SetSpellByID(currentSpellID)
+            GameTooltip:Show()
         end
     end
 end)
+
 frame:SetScript("OnLeave", function(self)
     GameTooltip:Hide()
 end)
@@ -190,7 +187,10 @@ eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == addonName then
-        -- Apply saved hotkey size
+        -- Apply saved settings
+        local size = KnackDB.settings.iconSize or 64
+        frame:SetSize(size, size)
+        icon:SetSize(size - 4, size - 4)
         hotkeyText:SetFont(FONT_PATH, KnackDB.settings.hotkeySize or 14, "OUTLINE")
         print("|cff00ff00[knack]|r loaded. Hold SHIFT to move the icon.")
     elseif event == "PLAYER_LOGIN" then
