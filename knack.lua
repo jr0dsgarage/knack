@@ -166,8 +166,20 @@ local function UpdateDisplay()
         return
     end
 
+    local spellChanged = (currentSpellID ~= spellID)
     currentSpellID = spellID
     icon:SetTexture(spellInfo.iconID)
+    
+    -- Update tooltip if spell changed and tooltip is currently showing
+    if spellChanged and GameTooltip:IsOwned(frame) and GameTooltip:IsShown() then
+        if KnackDB.settings.showTooltip then
+            if not KnackDB.settings.hideTooltipInCombat or not InCombatLockdown() then
+                GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
+                GameTooltip:SetSpellByID(currentSpellID)
+                GameTooltip:Show()
+            end
+        end
+    end
 
     local hotkey, inRange = GetHotkeyInfo(spellID)
     hotkeyText:SetText(hotkey)
