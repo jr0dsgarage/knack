@@ -24,8 +24,8 @@ local function CreateSettingsPanel()
     subtitle:SetText("Configure the next assisted combat spell icon display")
     
     local GROUP_SPACING = 2         -- Spacing between groups
-    local GROUP_TOP_PADDING = 8    -- Padding at top of group
-    local GROUP_BOTTOM_PADDING = 8  -- Padding at bottom of group
+    local GROUP_TOP_PADDING = 8     -- Padding at top of group
+    local GROUP_BOTTOM_PADDING = 6  -- Padding at bottom of group
     local GROUP_LEFT_PADDING = 10   -- Padding at left side of group
     local ITEM_SPACING = 4          -- Spacing between items within a group
     
@@ -174,41 +174,19 @@ local function CreateSettingsPanel()
     end)
     EndGroup(enableGroup)
     
-    -- GROUP 2: GCD Overlay & Opacity
-    local gcdGroup = BeginGroup()
-    AddCheckbox(gcdGroup, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "showGCD", function(self)
-        KnackDB.settings.showGCD = self:GetChecked()
-        KnackUpdateGCDOverlay()
+    -- GROUP 2: Icon Size, Reset Position & Instructions
+    local iconGroup = BeginGroup()
+    AddSlider(iconGroup, "KnackIconSizeSlider", 24, 128, KnackDB.settings.iconSize, "24", "128",
+        function(v) return "Icon Size: " .. v end,
+        function(v) KnackDB.settings.iconSize = v KnackUpdateIconSize() end)
+    AddButton(iconGroup, "Reset Position", 150, function()
+        KnackResetPosition()
+        print("|cff00ff00[knack]|r position reset to center.")
     end)
-    AddSlider(gcdGroup, "KnackGCDOpacitySlider", 0, 1, KnackDB.settings.gcdOpacity, "0%", "100%",
-        function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
-        function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end)
-    EndGroup(gcdGroup)
+    AddText(iconGroup, "Hold SHIFT and drag the spell icon to reposition it.", 0.7, 0.7, 0.7)
+    EndGroup(iconGroup)
     
-    -- GROUP 3: Tooltip Settings
-    local tooltipGroup = BeginGroup()
-    local tooltipCheck = AddCheckbox(tooltipGroup, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "showTooltip", function(self)
-        KnackDB.settings.showTooltip = self:GetChecked()
-        local hideCheck = _G["KnackHideTooltipInCombatCheck"]
-        if hideCheck then 
-            hideCheck:SetEnabled(self:GetChecked())
-            if not self:GetChecked() then
-                hideCheck:SetAlpha(0.5)
-            else
-                hideCheck:SetAlpha(1.0)
-            end
-        end
-    end)
-    local hideCheck = AddCheckbox(tooltipGroup, "Hide tooltip in combat", "Only show tooltip when out of combat", "hideTooltipInCombat", function(self)
-        KnackDB.settings.hideTooltipInCombat = self:GetChecked()
-    end, 20)
-    hideCheck:SetEnabled(KnackDB.settings.showTooltip)
-    if not KnackDB.settings.showTooltip then
-        hideCheck:SetAlpha(0.5)
-    end
-    EndGroup(tooltipGroup)
-    
-    -- GROUP 4: Hotkey Font & Size
+    -- GROUP 3: Hotkey Font & Size
     local hotkeyGroup = BeginGroup()
     
     -- Get available fonts
@@ -236,17 +214,39 @@ local function CreateSettingsPanel()
         function(v) KnackDB.settings.hotkeySize = v KnackUpdateHotkeySize() end)
     EndGroup(hotkeyGroup)
     
-    -- GROUP 5: Icon Size, Reset Position & Instructions
-    local iconGroup = BeginGroup()
-    AddSlider(iconGroup, "KnackIconSizeSlider", 24, 128, KnackDB.settings.iconSize, "24", "128",
-        function(v) return "Icon Size: " .. v end,
-        function(v) KnackDB.settings.iconSize = v KnackUpdateIconSize() end)
-    AddButton(iconGroup, "Reset Position", 150, function()
-        KnackResetPosition()
-        print("|cff00ff00[knack]|r position reset to center.")
+    -- GROUP 4: Tooltip Settings
+    local tooltipGroup = BeginGroup()
+    local tooltipCheck = AddCheckbox(tooltipGroup, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "showTooltip", function(self)
+        KnackDB.settings.showTooltip = self:GetChecked()
+        local hideCheck = _G["KnackHideTooltipInCombatCheck"]
+        if hideCheck then 
+            hideCheck:SetEnabled(self:GetChecked())
+            if not self:GetChecked() then
+                hideCheck:SetAlpha(0.5)
+            else
+                hideCheck:SetAlpha(1.0)
+            end
+        end
     end)
-    AddText(iconGroup, "Hold SHIFT and drag the spell icon to reposition it.", 0.7, 0.7, 0.7)
-    EndGroup(iconGroup)
+    local hideCheck = AddCheckbox(tooltipGroup, "Hide tooltip in combat", "Only show tooltip when out of combat", "hideTooltipInCombat", function(self)
+        KnackDB.settings.hideTooltipInCombat = self:GetChecked()
+    end, 20)
+    hideCheck:SetEnabled(KnackDB.settings.showTooltip)
+    if not KnackDB.settings.showTooltip then
+        hideCheck:SetAlpha(0.5)
+    end
+    EndGroup(tooltipGroup)
+    
+    -- GROUP 5: GCD Overlay & Opacity
+    local gcdGroup = BeginGroup()
+    AddCheckbox(gcdGroup, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "showGCD", function(self)
+        KnackDB.settings.showGCD = self:GetChecked()
+        KnackUpdateGCDOverlay()
+    end)
+    AddSlider(gcdGroup, "KnackGCDOpacitySlider", 0, 1, KnackDB.settings.gcdOpacity, "0%", "100%",
+        function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
+        function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end)
+    EndGroup(gcdGroup)
     
     return panel
 end
