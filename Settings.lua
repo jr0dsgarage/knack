@@ -17,50 +17,68 @@ local function CreateSettingsPanel()
     
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText("knack - Assisted Highlight Display")
+    title:SetText("knack - Next Assisted Combat")
     
     local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-    subtitle:SetText("Configure the assisted combat spell display")
+    subtitle:SetText("Configure the next assisted combat spell icon display")
     
-    local function CreateCheck(name, anchor, offset, label, tooltip, setting, callback)
-        local check = CreateFrame("CheckButton", name, panel, "InterfaceOptionsCheckButtonTemplate")
-        check:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, offset)
+    local GROUP_SPACING = 8         -- Spacing between groups
+    local GROUP_TOP_PADDING = 10    -- Padding at top of group
+    local GROUP_BOTTOM_PADDING = 8  -- Padding at bottom of group
+    local GROUP_LEFT_PADDING = 10   -- Padding at left side of group
+    local ITEM_SPACING = 4          -- Spacing between items within a group
+    
+    local lastAnchor = subtitle
+    local yOffset = -16
+    
+    -- Helper to create a group container
+    local function BeginGroup()
+        local group = CreateFrame("Frame", nil, panel, "BackdropTemplate")
+        group:SetPoint("TOPLEFT", lastAnchor, "BOTTOMLEFT", 0, yOffset)
+        group.elements = {}
+        group.currentY = -GROUP_TOP_PADDING
+        return group
+    end
+    
+    -- Helper to add backdrop and finalize group
+    local function EndGroup(group)
+        -- Calculate total height needed (current position + bottom padding)
+        local totalHeight = math.abs(group.currentY) + GROUP_BOTTOM_PADDING
+        group:SetSize(420, totalHeight)
+        
+        -- Add backdrop
+        group:SetBackdrop({
+            bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 16,
+            insets = { left = 4, right = 4, top = 4, bottom = 4 }
+        })
+        group:SetBackdropColor(0.1, 0.1, 0.1, 0.4)
+        group:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
+        
+        lastAnchor = group
+        yOffset = -GROUP_SPACING
+        return group
+    end
+    
+    -- Helper to create checkbox within a group
+    local function AddCheckbox(group, label, tooltip, setting, callback, indent)
+        local check = CreateFrame("CheckButton", "Knack" .. setting:gsub("^%l", string.upper):gsub("%a+", function(w) return w:gsub("^%l", string.upper) end) .. "Check", panel, "InterfaceOptionsCheckButtonTemplate")
+        check:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING + (indent or 0), group.currentY)
         check.Text:SetText(label)
         check.tooltipText = tooltip
         check:SetChecked(KnackDB.settings[setting])
         check:SetScript("OnClick", callback)
+        group.currentY = group.currentY - (check:GetHeight() + ITEM_SPACING)
+        table.insert(group.elements, check)
         return check
     end
     
-    local enableCheck = CreateCheck("KnackEnableCheck", subtitle, -16, "Enable knack", "Show/hide the assisted combat spell icon", "enabled", function(self)
-        KnackDB.settings.enabled = self:GetChecked()
-        KnackUpdateVisibility()
-    end)
-    
-    local enemyTargetCheck = CreateCheck("KnackEnemyTargetCheck", enableCheck, -8, "Only show with enemy target", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
-        KnackDB.settings.onlyWithEnemyTarget = self:GetChecked()
-    end)
-    
-    local gcdCheck = CreateCheck("KnackGCDCheck", enemyTargetCheck, -8, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "showGCD", function(self)
-        KnackDB.settings.showGCD = self:GetChecked()
-        KnackUpdateGCDOverlay()
-    end)
-    
-    local tooltipCheck = CreateCheck("KnackTooltipCheck", gcdCheck, -8, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "showTooltip", function(self)
-        KnackDB.settings.showTooltip = self:GetChecked()
-        local hideCheck = _G["KnackHideTooltipInCombatCheck"]
-        if hideCheck then hideCheck:SetEnabled(self:GetChecked()) end
-    end)
-    
-    local hideTooltipInCombatCheck = CreateCheck("KnackHideTooltipInCombatCheck", tooltipCheck, -8, "    Hide tooltip in combat", "Only show tooltip when out of combat", "hideTooltipInCombat", function(self)
-        KnackDB.settings.hideTooltipInCombat = self:GetChecked()
-    end)
-    hideTooltipInCombatCheck:SetEnabled(KnackDB.settings.showTooltip)
-    
-    local function CreateSlider(name, anchor, offset, min, max, value, lowText, highText, labelFormat, callback)
+    -- Helper to add slider within a group
+    local function AddSlider(group, name, min, max, value, lowText, highText, labelFormat, callback)
         local slider = CreateFrame("Slider", name, panel, "OptionsSliderTemplate")
-        slider:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", offset > -20 and 16 or 0, offset)
+        slider:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING, group.currentY - 12)  -- Offset down to account for label text above
         slider:SetMinMaxValues(min, max)
         slider:SetValue(value)
         slider:SetValueStep(min == 0 and 0.05 or 1)
@@ -70,31 +88,99 @@ local function CreateSettingsPanel()
         _G[name .. "High"]:SetText(highText)
         _G[name .. "Text"]:SetText(labelFormat(value))
         slider:SetScript("OnValueChanged", function(self, v) _G[name .. "Text"]:SetText(labelFormat(v)) callback(v) end)
+        group.currentY = group.currentY - 48  -- Sliders need space for label + slider
+        table.insert(group.elements, slider)
         return slider
     end
     
-    local gcdSlider = CreateSlider("KnackGCDOpacitySlider", hideTooltipInCombatCheck, -24, 0, 1, KnackDB.settings.gcdOpacity, "0%", "100%", 
+    -- Helper to create button within a group
+    local function AddButton(group, text, width, callback)
+        local button = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+        button:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING, group.currentY)
+        button:SetSize(width, 22)
+        button:SetText(text)
+        button:SetScript("OnClick", callback)
+        group.currentY = group.currentY - (button:GetHeight() + ITEM_SPACING)
+        table.insert(group.elements, button)
+        return button
+    end
+    
+    -- Helper to create text within a group
+    local function AddText(group, text, r, g, b)
+        local fontString = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        fontString:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING, group.currentY)
+        fontString:SetText(text)
+        if r and g and b then
+            fontString:SetTextColor(r, g, b)
+        end
+        group.currentY = group.currentY - (fontString:GetHeight() + ITEM_SPACING)
+        table.insert(group.elements, fontString)
+        return fontString
+    end
+    
+    -- GROUP 1: Enable & Enemy Target
+    local group1 = BeginGroup()
+    AddCheckbox(group1, "Enable knack", "Show/hide the assisted combat spell icon", "enabled", function(self)
+        KnackDB.settings.enabled = self:GetChecked()
+        KnackUpdateVisibility()
+    end)
+    AddCheckbox(group1, "Only show with enemy target", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
+        KnackDB.settings.onlyWithEnemyTarget = self:GetChecked()
+    end)
+    EndGroup(group1)
+    
+    -- GROUP 2: GCD Overlay & Opacity
+    local group2 = BeginGroup()
+    AddCheckbox(group2, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "showGCD", function(self)
+        KnackDB.settings.showGCD = self:GetChecked()
+        KnackUpdateGCDOverlay()
+    end)
+    AddSlider(group2, "KnackGCDOpacitySlider", 0, 1, KnackDB.settings.gcdOpacity, "0%", "100%",
         function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
         function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end)
+    EndGroup(group2)
     
-    local hotkeySlider = CreateSlider("KnackHotkeySizeSlider", gcdSlider, -32, 14, 34, KnackDB.settings.hotkeySize, "14", "34",
-        function(v) return "Hotkey Size: " .. v end,
+    -- GROUP 3: Tooltip Settings
+    local group3 = BeginGroup()
+    local tooltipCheck = AddCheckbox(group3, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "showTooltip", function(self)
+        KnackDB.settings.showTooltip = self:GetChecked()
+        local hideCheck = _G["KnackHideTooltipInCombatCheck"]
+        if hideCheck then 
+            hideCheck:SetEnabled(self:GetChecked())
+            if not self:GetChecked() then
+                hideCheck:SetAlpha(0.5)
+            else
+                hideCheck:SetAlpha(1.0)
+            end
+        end
+    end)
+    local hideCheck = AddCheckbox(group3, "Hide tooltip in combat", "Only show tooltip when out of combat", "hideTooltipInCombat", function(self)
+        KnackDB.settings.hideTooltipInCombat = self:GetChecked()
+    end, 20)
+    hideCheck:SetEnabled(KnackDB.settings.showTooltip)
+    if not KnackDB.settings.showTooltip then
+        hideCheck:SetAlpha(0.5)
+    end
+    EndGroup(group3)
+    
+    -- GROUP 4: Hotkey Font Size
+    local group4 = BeginGroup()
+    AddSlider(group4, "KnackHotkeySizeSlider", 14, 34, KnackDB.settings.hotkeySize, "14", "34",
+        function(v) return "Hotkey Font Size: " .. v end,
         function(v) KnackDB.settings.hotkeySize = v KnackUpdateHotkeySize() end)
+    EndGroup(group4)
     
-    local iconSizeSlider = CreateSlider("KnackIconSizeSlider", hotkeySlider, -32, 32, 128, KnackDB.settings.iconSize, "32", "128",
+    -- GROUP 5: Icon Size, Reset Position & Instructions
+    local group5 = BeginGroup()
+    AddSlider(group5, "KnackIconSizeSlider", 32, 128, KnackDB.settings.iconSize, "32", "128",
         function(v) return "Icon Size: " .. v end,
         function(v) KnackDB.settings.iconSize = v KnackUpdateIconSize() end)
-    
-    local resetButton = CreateFrame("Button", "KnackResetButton", panel, "UIPanelButtonTemplate")
-    resetButton:SetPoint("TOPLEFT", iconSizeSlider, "BOTTOMLEFT", -16, -24)
-    resetButton:SetSize(150, 22)
-    resetButton:SetText("Reset Position")
-    resetButton:SetScript("OnClick", function() KnackResetPosition() print("|cff00ff00[knack]|r position reset to center.") end)
-    
-    local instructions = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    instructions:SetPoint("TOPLEFT", resetButton, "BOTTOMLEFT", 0, -24)
-    instructions:SetText("Hold SHIFT and drag the spell icon to reposition it.")
-    instructions:SetTextColor(0.7, 0.7, 0.7)
+    AddButton(group5, "Reset Position", 150, function()
+        KnackResetPosition()
+        print("|cff00ff00[knack]|r position reset to center.")
+    end)
+    AddText(group5, "Hold SHIFT and drag the spell icon to reposition it.", 0.7, 0.7, 0.7)
+    EndGroup(group5)
     
     return panel
 end
