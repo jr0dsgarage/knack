@@ -8,11 +8,19 @@ local SCAN_INTERVAL = 0.1
 local function GetBindingNameForSlot(slot)
     if not slot then return nil end
     local button = ((slot - 1) % 12) + 1
-    local ranges = {{61, "MULTIACTIONBAR1BUTTON"}, {49, "MULTIACTIONBAR2BUTTON"}, {37, "MULTIACTIONBAR3BUTTON"}, {25, "MULTIACTIONBAR4BUTTON"}}
+    local ranges = {
+        {169, "MULTIACTIONBAR7BUTTON"}, -- Bar 8 (slots 169-180)
+        {157, "MULTIACTIONBAR6BUTTON"}, -- Bar 7 (slots 157-168) 
+        {145, "MULTIACTIONBAR5BUTTON"}, -- Bar 6 (slots 145-156) 
+        {61, "MULTIACTIONBAR1BUTTON"},  -- Bar 2 (slots 61-72) 
+        {49, "MULTIACTIONBAR2BUTTON"},  -- Bar 3 (slots 49-60) 
+        {37, "MULTIACTIONBAR4BUTTON"},  -- Bar 5 (slots 37-48) 
+        {25, "MULTIACTIONBAR3BUTTON"}   -- Bar 4 (slots 25-36) 
+    }
     for _, r in ipairs(ranges) do
         if slot >= r[1] and slot < r[1] + 12 then return r[2] .. button end
     end
-    return "ACTIONBUTTON" .. button
+    return "ACTIONBUTTON" .. button -- Bar 1 (slots 1-12)
 end
 
 local function SelectBinding(b1, b2)
