@@ -4,7 +4,7 @@ local addonName = ...
 -- Initialize settings with defaults
 function KnackInitializeSettings()
     KnackDB = KnackDB or { point = "CENTER", relativePoint = "CENTER", xOfs = 0, yOfs = 0, settings = {} }
-    local defaults = {enabled = true, onlyWithEnemyTarget = false, showGCD = true, gcdOpacity = 0.7, hotkeySize = 14, iconSize = 64, showTooltip = true, hideTooltipInCombat = false}
+    local defaults = {enabled = true, onlyWithEnemyTarget = false, showGCD = true, gcdOpacity = 0.7, hotkeySize = 14, hotkeyFont = "Friz Quadrata TT", iconSize = 64, showTooltip = true, hideTooltipInCombat = false}
     for key, value in pairs(defaults) do
         if KnackDB.settings[key] == nil then KnackDB.settings[key] = value end
     end
@@ -23,8 +23,8 @@ local function CreateSettingsPanel()
     subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
     subtitle:SetText("Configure the next assisted combat spell icon display")
     
-    local GROUP_SPACING = 8         -- Spacing between groups
-    local GROUP_TOP_PADDING = 10    -- Padding at top of group
+    local GROUP_SPACING = 2         -- Spacing between groups
+    local GROUP_TOP_PADDING = 8    -- Padding at top of group
     local GROUP_BOTTOM_PADDING = 8  -- Padding at bottom of group
     local GROUP_LEFT_PADDING = 10   -- Padding at left side of group
     local ITEM_SPACING = 4          -- Spacing between items within a group
@@ -78,17 +78,19 @@ local function CreateSettingsPanel()
     -- Helper to add slider within a group
     local function AddSlider(group, name, min, max, value, lowText, highText, labelFormat, callback)
         local slider = CreateFrame("Slider", name, panel, "OptionsSliderTemplate")
-        slider:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING, group.currentY - 12)  -- Offset down to account for label text above
+        -- Sliders have their label above, so we need to offset down for the label space
+        slider:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING + 8, group.currentY - 16)
         slider:SetMinMaxValues(min, max)
         slider:SetValue(value)
-        slider:SetValueStep(min == 0 and 0.05 or 1)
+        slider:SetValueStep(min == 0 and 0.05 or 1) 
         slider:SetObeyStepOnDrag(true)
         slider:SetWidth(200)
         _G[name .. "Low"]:SetText(lowText)
         _G[name .. "High"]:SetText(highText)
         _G[name .. "Text"]:SetText(labelFormat(value))
         slider:SetScript("OnValueChanged", function(self, v) _G[name .. "Text"]:SetText(labelFormat(v)) callback(v) end)
-        group.currentY = group.currentY - 48  -- Sliders need space for label + slider
+        -- Total height: 16 (label space) + 17 (slider) + 15 (low/high text) + ITEM_SPACING
+        group.currentY = group.currentY - (48 + ITEM_SPACING)
         table.insert(group.elements, slider)
         return slider
     end
@@ -118,31 +120,74 @@ local function CreateSettingsPanel()
         return fontString
     end
     
+    -- Helper to create dropdown within a group
+    local function AddDropdown(group, labelText, items, currentValue, callback)
+        local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        label:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING, group.currentY)
+        label:SetText(labelText)
+        
+        local dropdown = CreateFrame("Frame", "KnackFontDropdown", panel, "UIDropDownMenuTemplate")
+        dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING - 16, group.currentY - 20)
+        UIDropDownMenu_SetWidth(dropdown, 200)
+        UIDropDownMenu_SetText(dropdown, currentValue)
+        
+        -- Store LSM reference for font rendering
+        local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+        
+        UIDropDownMenu_Initialize(dropdown, function(self, level)
+            for _, item in ipairs(items) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = item
+                info.func = function()
+                    UIDropDownMenu_SetText(dropdown, item)
+                    callback(item)
+                end
+                info.checked = (item == currentValue)
+                
+                -- Render the dropdown item text in its own font
+                if LSM then
+                    local fontPath = LSM:Fetch("font", item)
+                    if fontPath then
+                        info.fontObject = CreateFont("KnackDropdownFont_" .. item:gsub("[^%w]", ""))
+                        info.fontObject:SetFont(fontPath, 12, "OUTLINE")
+                    end
+                end
+                
+                UIDropDownMenu_AddButton(info)
+            end
+        end)
+        
+        group.currentY = group.currentY - 50  -- Dropdowns need space for label + dropdown
+        table.insert(group.elements, label)
+        table.insert(group.elements, dropdown)
+        return dropdown
+    end
+    
     -- GROUP 1: Enable & Enemy Target
-    local group1 = BeginGroup()
-    AddCheckbox(group1, "Enable knack", "Show/hide the assisted combat spell icon", "enabled", function(self)
+    local enableGroup = BeginGroup()
+    AddCheckbox(enableGroup, "Enable knack", "Show/hide the assisted combat spell icon", "enabled", function(self)
         KnackDB.settings.enabled = self:GetChecked()
         KnackUpdateVisibility()
     end)
-    AddCheckbox(group1, "Only show with enemy target", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
+    AddCheckbox(enableGroup, "Only show with enemy target", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
         KnackDB.settings.onlyWithEnemyTarget = self:GetChecked()
     end)
-    EndGroup(group1)
+    EndGroup(enableGroup)
     
     -- GROUP 2: GCD Overlay & Opacity
-    local group2 = BeginGroup()
-    AddCheckbox(group2, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "showGCD", function(self)
+    local gcdGroup = BeginGroup()
+    AddCheckbox(gcdGroup, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "showGCD", function(self)
         KnackDB.settings.showGCD = self:GetChecked()
         KnackUpdateGCDOverlay()
     end)
-    AddSlider(group2, "KnackGCDOpacitySlider", 0, 1, KnackDB.settings.gcdOpacity, "0%", "100%",
+    AddSlider(gcdGroup, "KnackGCDOpacitySlider", 0, 1, KnackDB.settings.gcdOpacity, "0%", "100%",
         function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
         function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end)
-    EndGroup(group2)
+    EndGroup(gcdGroup)
     
     -- GROUP 3: Tooltip Settings
-    local group3 = BeginGroup()
-    local tooltipCheck = AddCheckbox(group3, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "showTooltip", function(self)
+    local tooltipGroup = BeginGroup()
+    local tooltipCheck = AddCheckbox(tooltipGroup, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "showTooltip", function(self)
         KnackDB.settings.showTooltip = self:GetChecked()
         local hideCheck = _G["KnackHideTooltipInCombatCheck"]
         if hideCheck then 
@@ -154,33 +199,54 @@ local function CreateSettingsPanel()
             end
         end
     end)
-    local hideCheck = AddCheckbox(group3, "Hide tooltip in combat", "Only show tooltip when out of combat", "hideTooltipInCombat", function(self)
+    local hideCheck = AddCheckbox(tooltipGroup, "Hide tooltip in combat", "Only show tooltip when out of combat", "hideTooltipInCombat", function(self)
         KnackDB.settings.hideTooltipInCombat = self:GetChecked()
     end, 20)
     hideCheck:SetEnabled(KnackDB.settings.showTooltip)
     if not KnackDB.settings.showTooltip then
         hideCheck:SetAlpha(0.5)
     end
-    EndGroup(group3)
+    EndGroup(tooltipGroup)
     
-    -- GROUP 4: Hotkey Font Size
-    local group4 = BeginGroup()
-    AddSlider(group4, "KnackHotkeySizeSlider", 14, 34, KnackDB.settings.hotkeySize, "14", "34",
+    -- GROUP 4: Hotkey Font & Size
+    local hotkeyGroup = BeginGroup()
+    
+    -- Get available fonts
+    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+    local fontList = {}
+    if LSM then
+        for _, fontName in pairs(LSM:List("font")) do
+            table.insert(fontList, fontName)
+        end
+        table.sort(fontList)
+    else
+        -- Fallback to default WoW fonts if LSM not available
+        fontList = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
+    end
+    
+    AddDropdown(hotkeyGroup, "Hotkey Font:", fontList, KnackDB.settings.hotkeyFont or "Friz Quadrata TT", function(fontName)
+        KnackDB.settings.hotkeyFont = fontName
+        if KnackUpdateHotkeyFont then
+            KnackUpdateHotkeyFont()
+        end
+    end)
+    
+    AddSlider(hotkeyGroup, "KnackHotkeySizeSlider", 8, 34, KnackDB.settings.hotkeySize, "8", "34",
         function(v) return "Hotkey Font Size: " .. v end,
         function(v) KnackDB.settings.hotkeySize = v KnackUpdateHotkeySize() end)
-    EndGroup(group4)
+    EndGroup(hotkeyGroup)
     
     -- GROUP 5: Icon Size, Reset Position & Instructions
-    local group5 = BeginGroup()
-    AddSlider(group5, "KnackIconSizeSlider", 32, 128, KnackDB.settings.iconSize, "32", "128",
+    local iconGroup = BeginGroup()
+    AddSlider(iconGroup, "KnackIconSizeSlider", 24, 128, KnackDB.settings.iconSize, "24", "128",
         function(v) return "Icon Size: " .. v end,
         function(v) KnackDB.settings.iconSize = v KnackUpdateIconSize() end)
-    AddButton(group5, "Reset Position", 150, function()
+    AddButton(iconGroup, "Reset Position", 150, function()
         KnackResetPosition()
         print("|cff00ff00[knack]|r position reset to center.")
     end)
-    AddText(group5, "Hold SHIFT and drag the spell icon to reposition it.", 0.7, 0.7, 0.7)
-    EndGroup(group5)
+    AddText(iconGroup, "Hold SHIFT and drag the spell icon to reposition it.", 0.7, 0.7, 0.7)
+    EndGroup(iconGroup)
     
     return panel
 end

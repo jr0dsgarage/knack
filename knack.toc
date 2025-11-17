@@ -4,6 +4,7 @@
 ## Author: Your Name
 ## Version: 1.0.0
 ## SavedVariables: KnackDB
+## OptionalDeps: LibSharedMedia-3.0
 
 Settings.lua
 knack.lua

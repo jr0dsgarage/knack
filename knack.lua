@@ -5,6 +5,15 @@ local MOVE_CURSOR = "Interface\\CURSOR\\UI-Cursor-Move"
 local GCD_SPELL_ID = 61304
 local SCAN_INTERVAL = 0.1
 
+-- Helper to get font path from LibSharedMedia or fallback
+local function GetFontPath(fontName)
+    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+    if LSM and fontName then
+        return LSM:Fetch("font", fontName) or FONT_PATH
+    end
+    return FONT_PATH
+end
+
 local function GetBindingNameForSlot(slot)
     if not slot then return nil end
     local button = ((slot - 1) % 12) + 1
@@ -73,7 +82,8 @@ icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
 -- Create hotkey text
 local hotkeyText = frame:CreateFontString(nil, "OVERLAY")
-hotkeyText:SetFont(FONT_PATH, KnackDB.settings.hotkeySize or 14, "OUTLINE")
+local fontPath = GetFontPath(KnackDB.settings.hotkeyFont)
+hotkeyText:SetFont(fontPath, KnackDB.settings.hotkeySize or 14, "OUTLINE")
 hotkeyText:SetPoint("TOPRIGHT", icon, "TOPRIGHT", 2, 2)
 hotkeyText:SetTextColor(1, 1, 1, 1)
 
@@ -221,7 +231,8 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         local size = KnackDB.settings.iconSize or 64
         frame:SetSize(size, size)
         icon:SetSize(size - 4, size - 4)
-        hotkeyText:SetFont(FONT_PATH, KnackDB.settings.hotkeySize or 14, "OUTLINE")
+        local fontPath = GetFontPath(KnackDB.settings.hotkeyFont)
+        hotkeyText:SetFont(fontPath, KnackDB.settings.hotkeySize or 14, "OUTLINE")
         print("|cff00ff00[knack]|r loaded. Hold SHIFT to move the icon.")
     elseif event == "PLAYER_LOGIN" then
         ApplyPosition()
@@ -233,7 +244,14 @@ end)
 -- Global functions for settings panel
 function KnackUpdateVisibility() if KnackDB.settings.enabled then UpdateDisplay() else frame:Hide() end end
 function KnackUpdateGCDOverlay() (KnackDB.settings.showGCD and gcdOverlay.Show or gcdOverlay.Hide)(gcdOverlay) end
-function KnackUpdateHotkeySize() hotkeyText:SetFont(FONT_PATH, KnackDB.settings.hotkeySize, "OUTLINE") end
+function KnackUpdateHotkeyFont() 
+    local fontPath = GetFontPath(KnackDB.settings.hotkeyFont)
+    hotkeyText:SetFont(fontPath, KnackDB.settings.hotkeySize, "OUTLINE") 
+end
+function KnackUpdateHotkeySize() 
+    local fontPath = GetFontPath(KnackDB.settings.hotkeyFont)
+    hotkeyText:SetFont(fontPath, KnackDB.settings.hotkeySize, "OUTLINE") 
+end
 function KnackUpdateIconSize() local size = KnackDB.settings.iconSize frame:SetSize(size, size) icon:SetSize(size - 4, size - 4) end
 function KnackResetPosition() KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = "CENTER", "CENTER", 0, 0 ApplyPosition() end
 
