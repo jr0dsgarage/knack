@@ -29,7 +29,7 @@ end
 
 local function FormatBinding(binding)
     if not binding then return "" end
-    return binding:gsub("SHIFT%-", "S-"):gsub("CTRL%-", "C-"):gsub("ALT%-", "A-"):gsub("BUTTON", "M")
+    return (binding:gsub("SHIFT%-", "S-"):gsub("CTRL%-", "C-"):gsub("ALT%-", "A-"):gsub("BUTTON", "M"))
 end
 
 -- Initialize saved variables
@@ -129,9 +129,19 @@ end
 local function GetHotkeyInfo(spellID)
     local slots = C_ActionBar.FindSpellActionButtons(spellID)
     if not slots or not slots[1] then return "", true end
-    local bindingName = GetBindingNameForSlot(slots[1])
-    local binding = bindingName and SelectBinding(GetBindingKey(bindingName))
-    return FormatBinding(binding), C_Spell.IsSpellInRange(spellID, "target") ~= false
+    
+    -- Get bindings for up to 3 slots
+    local bindings = {}
+    for i = 1, math.min(3, #slots) do
+        local bindingName = GetBindingNameForSlot(slots[i])
+        local binding = bindingName and SelectBinding(GetBindingKey(bindingName))
+        if binding then
+            table.insert(bindings, FormatBinding(binding))
+        end
+    end
+    
+    local hotkeyText = table.concat(bindings, "\n")
+    return hotkeyText, C_Spell.IsSpellInRange(spellID, "target") ~= false
 end
 
 -- Update the display
