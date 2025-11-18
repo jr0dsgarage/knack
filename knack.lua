@@ -5,7 +5,7 @@ local CONSTANTS = {
     FONT = {
         DEFAULT_PATH = "Fonts\\FRIZQT__.TTF",
         DEFAULT_SIZE = 14,
-        OFFSET = 4,
+        OFFSET = 0,
         COLOR_IN_RANGE = {r = 1, g = 1, b = 1, a = 1},
         COLOR_OUT_OF_RANGE = {r = 0.8, g = 0.1, b = 0.1, a = 1}
     },
