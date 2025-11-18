@@ -10,10 +10,10 @@ local GRAY_TEXT_COLOR = 0.7
 local ICON_SIZE_MIN = 24
 local ICON_SIZE_MAX = 128
 local HOTKEY_SIZE_MIN = 8
-local HOTKEY_SIZE_MAX = 34
-local OPACITY_MIN = 0
-local OPACITY_MAX = 1
-local OPACITY_STEP = 0.05
+local HOTKEY_SIZE_MAX = 32
+local GCD_OPACITY_MIN = 0
+local GCD_OPACITY_MAX = 1
+local GCD_OPACITY_STEP = 0.05
 local PERCENTAGE_MULTIPLIER = 100
 
 -- UI Element Size Constants
@@ -110,7 +110,7 @@ local function CreateSettingsPanel()
         slider:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING + SETTINGS_PADDING_SMALL, group.currentY - SETTINGS_PADDING_LARGE)
         slider:SetMinMaxValues(min, max)
         slider:SetValue(value)
-        slider:SetValueStep(min == OPACITY_MIN and OPACITY_STEP or 1) 
+        slider:SetValueStep(min == GCD_OPACITY_MIN and GCD_OPACITY_STEP or 1) 
         slider:SetObeyStepOnDrag(true)
         slider:SetWidth(SLIDER_WIDTH)
         _G[name .. "Low"]:SetText(lowText)
@@ -275,7 +275,7 @@ local function CreateSettingsPanel()
         KnackDB.settings.showGCD = self:GetChecked()
         KnackUpdateGCDOverlay()
     end)
-    AddSlider(gcdGroup, "KnackGCDOpacitySlider", OPACITY_MIN, OPACITY_MAX, KnackDB.settings.gcdOpacity, tostring(OPACITY_MIN) .. "%", tostring(OPACITY_MAX * PERCENTAGE_MULTIPLIER) .. "%",
+    AddSlider(gcdGroup, "KnackGCDOpacitySlider", GCD_OPACITY_MIN, GCD_OPACITY_MAX, KnackDB.settings.gcdOpacity, tostring(GCD_OPACITY_MIN) .. "%", tostring(GCD_OPACITY_MAX * PERCENTAGE_MULTIPLIER) .. "%",
         function(v) return "GCD Overlay Opacity: " .. math.floor(v * PERCENTAGE_MULTIPLIER) .. "%" end,
         function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end)
     EndGroup(gcdGroup)
