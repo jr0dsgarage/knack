@@ -1,7 +1,7 @@
 local addonName = ...
 
 -- Constants
-local FONT_PATH = "Fonts\\FRIZQT__.TTF"
+local DEFAULT_FONT_PATH = "Fonts\\FRIZQT__.TTF"
 local MOVE_CURSOR = "Interface\\CURSOR\\UI-Cursor-Move"
 local GCD_SPELL_ID = 61304
 local SCAN_INTERVAL = 0.1
@@ -40,9 +40,9 @@ local ACTION_BAR_SLOTS = {
 local function GetFontPath(fontName)
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     if LSM and fontName then
-        return LSM:Fetch("font", fontName) or FONT_PATH
+        return LSM:Fetch("font", fontName) or DEFAULT_FONT_PATH
     end
-    return FONT_PATH
+    return DEFAULT_FONT_PATH
 end
 
 local function GetBindingNameForSlot(slot)
