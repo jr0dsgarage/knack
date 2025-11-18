@@ -122,7 +122,7 @@ local function CreateSettingsPanel()
     
     -- Helper to create dropdown within a group
     local function AddDropdown(group, labelText, items, currentValue, callback)
-        local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        local label = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
         label:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING, group.currentY)
         label:SetText(labelText)
         
