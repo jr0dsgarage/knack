@@ -176,14 +176,18 @@ local function CreateSettingsPanel()
     
     -- GROUP 2: Icon Size, Reset Position & Instructions
     local iconGroup = BeginGroup()
+    AddText(iconGroup, "Hold SHIFT and use the scrollwheel to resize the spell icon", 0.7, 0.7, 0.7)
     AddSlider(iconGroup, "KnackIconSizeSlider", 24, 128, KnackDB.settings.iconSize, "24", "128",
         function(v) return "Icon Size: " .. v end,
-        function(v) KnackDB.settings.iconSize = v KnackUpdateIconSize() end)
+        function(v)
+            KnackDB.settings.iconSize = v
+            KnackUpdateIconSize()
+        end)
+    AddText(iconGroup, "Hold SHIFT and drag the spell icon to reposition it.", 0.7, 0.7, 0.7)
     AddButton(iconGroup, "Reset Position", 150, function()
         KnackResetPosition()
         print("|cff00ff00[knack]|r position reset to center.")
     end)
-    AddText(iconGroup, "Hold SHIFT and drag the spell icon to reposition it.", 0.7, 0.7, 0.7)
     EndGroup(iconGroup)
     
     -- GROUP 3: Hotkey Font & Size
