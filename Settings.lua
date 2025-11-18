@@ -14,7 +14,6 @@ local HOTKEY_SIZE_MAX = 32
 local GCD_OPACITY_MIN = 0
 local GCD_OPACITY_MAX = 1
 local GCD_OPACITY_STEP = 0.05
-local PERCENTAGE_MULTIPLIER = 100
 
 -- UI Element Size Constants
 local BUTTON_HEIGHT = 22
@@ -275,8 +274,8 @@ local function CreateSettingsPanel()
         KnackDB.settings.showGCD = self:GetChecked()
         KnackUpdateGCDOverlay()
     end)
-    AddSlider(gcdGroup, "KnackGCDOpacitySlider", GCD_OPACITY_MIN, GCD_OPACITY_MAX, KnackDB.settings.gcdOpacity, tostring(GCD_OPACITY_MIN) .. "%", tostring(GCD_OPACITY_MAX * PERCENTAGE_MULTIPLIER) .. "%",
-        function(v) return "GCD Overlay Opacity: " .. math.floor(v * PERCENTAGE_MULTIPLIER) .. "%" end,
+    AddSlider(gcdGroup, "KnackGCDOpacitySlider", GCD_OPACITY_MIN, GCD_OPACITY_MAX, KnackDB.settings.gcdOpacity, tostring(GCD_OPACITY_MIN) .. "%", tostring(GCD_OPACITY_MAX * OPACITY_TO_PERCENTAGE) .. "%",
+        function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
         function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end)
     EndGroup(gcdGroup)
     
