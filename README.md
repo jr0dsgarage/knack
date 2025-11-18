@@ -77,4 +77,4 @@ Access the settings panel through `/knack` or the WoW interface options menu. Se
 
 ## Credits
 
-Created for WoW 12.0.0 using the C_AssistedCombat API.
+Created for WoW using Claude Sonnet 4.5 and ChatGPT 5.1
