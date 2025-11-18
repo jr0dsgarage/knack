@@ -2,6 +2,8 @@
 
 A World of Warcraft addon that displays the next spell highlighted by the Assisted Combat feature with hotkey bindings.
 
+Quickly get the _knack_ of playing your class!
+
 ## Features
 
 - **Assisted Combat Integration**: Displays the spell icon recommended by WoW's Assisted Combat system
