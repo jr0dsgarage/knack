@@ -1,6 +1,34 @@
 -- Knack Settings Panel
 local addonName = ...
 
+-- UI Layout Constants
+local SETTINGS_PADDING_LARGE = 16
+local SETTINGS_PADDING_SMALL = 8
+local GRAY_TEXT_COLOR = 0.7
+
+-- Slider Range Constants
+local ICON_SIZE_MIN = 24
+local ICON_SIZE_MAX = 128
+local HOTKEY_SIZE_MIN = 8
+local HOTKEY_SIZE_MAX = 34
+local OPACITY_MIN = 0
+local OPACITY_MAX = 1
+local OPACITY_STEP = 0.05
+local PERCENTAGE_MULTIPLIER = 100
+
+-- UI Element Size Constants
+local BUTTON_HEIGHT = 22
+local SLIDER_WIDTH = 200
+local DROPDOWN_WIDTH = 200
+
+-- Alpha Constants
+local DISABLED_ALPHA = 0.5
+local ENABLED_ALPHA = 1.0
+
+-- Spacing Constants
+local SLIDER_TOTAL_HEIGHT = 48
+local DROPDOWN_TOTAL_HEIGHT = 50
+
 -- Initialize settings with defaults
 function KnackInitializeSettings()
     KnackDB = KnackDB or { point = "CENTER", relativePoint = "CENTER", xOfs = 0, yOfs = 0, settings = {} }
@@ -16,21 +44,21 @@ local function CreateSettingsPanel()
     panel.name = "knack"
     
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetPoint("TOPLEFT", SETTINGS_PADDING_LARGE, -SETTINGS_PADDING_LARGE)
     title:SetText("knack - Next Assisted Combat")
     
     local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
+    subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -SETTINGS_PADDING_SMALL)
     subtitle:SetText("Configure the next assisted combat spell icon display")
     
     local GROUP_SPACING = 2         -- Spacing between groups
-    local GROUP_TOP_PADDING = 8     -- Padding at top of group
+    local GROUP_TOP_PADDING = SETTINGS_PADDING_SMALL     -- Padding at top of group
     local GROUP_BOTTOM_PADDING = 6  -- Padding at bottom of group
     local GROUP_LEFT_PADDING = 10   -- Padding at left side of group
     local ITEM_SPACING = 4          -- Spacing between items within a group
     
     local lastAnchor = subtitle
-    local yOffset = -16
+    local yOffset = -SETTINGS_PADDING_LARGE
     
     -- Helper to create a group container
     local function BeginGroup()
@@ -79,18 +107,18 @@ local function CreateSettingsPanel()
     local function AddSlider(group, name, min, max, value, lowText, highText, labelFormat, callback)
         local slider = CreateFrame("Slider", name, panel, "OptionsSliderTemplate")
         -- Sliders have their label above, so we need to offset down for the label space
-        slider:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING + 8, group.currentY - 16)
+        slider:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING + SETTINGS_PADDING_SMALL, group.currentY - SETTINGS_PADDING_LARGE)
         slider:SetMinMaxValues(min, max)
         slider:SetValue(value)
-        slider:SetValueStep(min == 0 and 0.05 or 1) 
+        slider:SetValueStep(min == OPACITY_MIN and OPACITY_STEP or 1) 
         slider:SetObeyStepOnDrag(true)
-        slider:SetWidth(200)
+        slider:SetWidth(SLIDER_WIDTH)
         _G[name .. "Low"]:SetText(lowText)
         _G[name .. "High"]:SetText(highText)
         _G[name .. "Text"]:SetText(labelFormat(value))
         slider:SetScript("OnValueChanged", function(self, v) _G[name .. "Text"]:SetText(labelFormat(v)) callback(v) end)
         -- Total height: 16 (label space) + 17 (slider) + 15 (low/high text) + ITEM_SPACING
-        group.currentY = group.currentY - (48 + ITEM_SPACING)
+        group.currentY = group.currentY - (SLIDER_TOTAL_HEIGHT + ITEM_SPACING)
         table.insert(group.elements, slider)
         return slider
     end
@@ -99,7 +127,7 @@ local function CreateSettingsPanel()
     local function AddButton(group, text, width, callback)
         local button = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
         button:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING, group.currentY)
-        button:SetSize(width, 22)
+        button:SetSize(width, BUTTON_HEIGHT)
         button:SetText(text)
         button:SetScript("OnClick", callback)
         group.currentY = group.currentY - (button:GetHeight() + ITEM_SPACING)
@@ -127,8 +155,8 @@ local function CreateSettingsPanel()
         label:SetText(labelText)
         
         local dropdown = CreateFrame("Frame", "KnackFontDropdown", panel, "UIDropDownMenuTemplate")
-        dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING - 16, group.currentY - 20)
-        UIDropDownMenu_SetWidth(dropdown, 200)
+        dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", GROUP_LEFT_PADDING - SETTINGS_PADDING_LARGE, group.currentY - 20)
+        UIDropDownMenu_SetWidth(dropdown, DROPDOWN_WIDTH)
         UIDropDownMenu_SetText(dropdown, currentValue)
         
         -- Store LSM reference for font rendering
@@ -157,7 +185,7 @@ local function CreateSettingsPanel()
             end
         end)
         
-        group.currentY = group.currentY - 50  -- Dropdowns need space for label + dropdown
+        group.currentY = group.currentY - DROPDOWN_TOTAL_HEIGHT  -- Dropdowns need space for label + dropdown
         table.insert(group.elements, label)
         table.insert(group.elements, dropdown)
         return dropdown
@@ -176,8 +204,8 @@ local function CreateSettingsPanel()
     
     -- GROUP 2: Icon Size, Reset Position & Instructions
     local iconGroup = BeginGroup()
-    AddText(iconGroup, "Hold SHIFT and use the scrollwheel to resize the spell icon", 0.7, 0.7, 0.7)
-    AddSlider(iconGroup, "KnackIconSizeSlider", 24, 128, KnackDB.settings.iconSize, "24", "128",
+    AddText(iconGroup, "Hold SHIFT and use the scrollwheel to resize the spell icon", GRAY_TEXT_COLOR, GRAY_TEXT_COLOR, GRAY_TEXT_COLOR)
+    AddSlider(iconGroup, "KnackIconSizeSlider", ICON_SIZE_MIN, ICON_SIZE_MAX, KnackDB.settings.iconSize, tostring(ICON_SIZE_MIN), tostring(ICON_SIZE_MAX),
         function(v) return "Icon Size: " .. v end,
         function(v)
             KnackDB.settings.iconSize = v
@@ -213,7 +241,7 @@ local function CreateSettingsPanel()
         end
     end)
     
-    AddSlider(hotkeyGroup, "KnackHotkeySizeSlider", 8, 34, KnackDB.settings.hotkeySize, "8", "34",
+    AddSlider(hotkeyGroup, "KnackHotkeySizeSlider", HOTKEY_SIZE_MIN, HOTKEY_SIZE_MAX, KnackDB.settings.hotkeySize, tostring(HOTKEY_SIZE_MIN), tostring(HOTKEY_SIZE_MAX),
         function(v) return "Hotkey Font Size: " .. v end,
         function(v) KnackDB.settings.hotkeySize = v KnackUpdateHotkeySize() end)
     EndGroup(hotkeyGroup)
@@ -226,9 +254,9 @@ local function CreateSettingsPanel()
         if hideCheck then 
             hideCheck:SetEnabled(self:GetChecked())
             if not self:GetChecked() then
-                hideCheck:SetAlpha(0.5)
+                hideCheck:SetAlpha(DISABLED_ALPHA)
             else
-                hideCheck:SetAlpha(1.0)
+                hideCheck:SetAlpha(ENABLED_ALPHA)
             end
         end
     end)
@@ -237,7 +265,7 @@ local function CreateSettingsPanel()
     end, 20)
     hideCheck:SetEnabled(KnackDB.settings.showTooltip)
     if not KnackDB.settings.showTooltip then
-        hideCheck:SetAlpha(0.5)
+        hideCheck:SetAlpha(DISABLED_ALPHA)
     end
     EndGroup(tooltipGroup)
     
@@ -247,8 +275,8 @@ local function CreateSettingsPanel()
         KnackDB.settings.showGCD = self:GetChecked()
         KnackUpdateGCDOverlay()
     end)
-    AddSlider(gcdGroup, "KnackGCDOpacitySlider", 0, 1, KnackDB.settings.gcdOpacity, "0%", "100%",
-        function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
+    AddSlider(gcdGroup, "KnackGCDOpacitySlider", OPACITY_MIN, OPACITY_MAX, KnackDB.settings.gcdOpacity, tostring(OPACITY_MIN) .. "%", tostring(OPACITY_MAX * PERCENTAGE_MULTIPLIER) .. "%",
+        function(v) return "GCD Overlay Opacity: " .. math.floor(v * PERCENTAGE_MULTIPLIER) .. "%" end,
         function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end)
     EndGroup(gcdGroup)
     
