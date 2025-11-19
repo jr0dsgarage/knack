@@ -28,29 +28,30 @@ local CONSTANTS = {
         ENABLED = 1.0
     },
     
-    OPACITY_TO_PERCENTAGE = 100
+}
+
+-- Global Defaults
+KnackDefaultSettings = {
+    enabled = true, 
+    onlyWithEnemyTarget = false, 
+    showGCD = true, 
+    gcdOpacity = 0.7, 
+    hotkeySize = 14, 
+    hotkeyFont = "Friz Quadrata TT", 
+    iconSize = 64, 
+    showTooltip = true, 
+    hideTooltipInCombat = false,
+    showBorder = false,
+    borderTexture = "Blizzard Tooltip",
+    borderWidth = 16,
+    borderOffset = 2,
+    borderColor = {1, 1, 1, 1}
 }
 
 -- Initialize settings with defaults
 function KnackInitializeSettings()
     KnackDB = KnackDB or { point = "CENTER", relativePoint = "CENTER", xOfs = 0, yOfs = 0, settings = {} }
-    local defaults = {
-        enabled = true, 
-        onlyWithEnemyTarget = false, 
-        showGCD = true, 
-        gcdOpacity = 0.7, 
-        hotkeySize = 14, 
-        hotkeyFont = "Friz Quadrata TT", 
-        iconSize = 64, 
-        showTooltip = true, 
-        hideTooltipInCombat = false,
-        showBorder = false,
-        borderTexture = "Blizzard Tooltip",
-        borderWidth = 16,
-        borderOffset = 2,
-        borderColor = {1, 1, 1, 1}
-    }
-    for key, value in pairs(defaults) do
+    for key, value in pairs(KnackDefaultSettings) do
         if KnackDB.settings[key] == nil then KnackDB.settings[key] = value end
     end
 end
@@ -435,7 +436,7 @@ local function CreateSettingsPanel()
     end)
     
     builder:AddSlider(gcdGroup, "KnackGCDOpacitySlider", CONSTANTS.SLIDER.GCD_MIN, CONSTANTS.SLIDER.GCD_MAX, KnackDB.settings.gcdOpacity, 
-        tostring(CONSTANTS.SLIDER.GCD_MIN) .. "%", tostring(CONSTANTS.SLIDER.GCD_MAX * CONSTANTS.OPACITY_TO_PERCENTAGE) .. "%",
+        tostring(CONSTANTS.SLIDER.GCD_MIN) .. "%", tostring(CONSTANTS.SLIDER.GCD_MAX * 100) .. "%",
         function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
         function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end,
         CONSTANTS.SLIDER.GCD_STEP)

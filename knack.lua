@@ -4,13 +4,11 @@ local addonName = ...
 local CONSTANTS = {
     FONT = {
         DEFAULT_PATH = "Fonts\\FRIZQT__.TTF",
-        DEFAULT_SIZE = 14,
         OFFSET = 0,
         COLOR_IN_RANGE = {r = 1, g = 1, b = 1, a = 1},
         COLOR_OUT_OF_RANGE = {r = 0.8, g = 0.1, b = 0.1, a = 1}
     },
     ICON = {
-        DEFAULT_SIZE = 64,
         MIN_SIZE = 32,
         MAX_SIZE = 128,
         PADDING = 4,
@@ -21,13 +19,7 @@ local CONSTANTS = {
     },
     GCD = {
         SPELL_ID = 61304,
-        SWIPE_COLOR = {r = 0, g = 0, b = 0, a = 1},
-        OPACITY_DEFAULT = 0.7
-    },
-    BORDER = {
-        DEFAULT_WIDTH = 16,
-        DEFAULT_OFFSET = 2,
-        DEFAULT_COLOR = {r = 1, g = 1, b = 1, a = 1}
+        SWIPE_COLOR = {r = 0, g = 0, b = 0, a = 1}
     },
     SCAN_INTERVAL = 0.1,
     MOVE_CURSOR = "Interface\\CURSOR\\UI-Cursor-Move",
@@ -176,7 +168,7 @@ function KnackDisplay:SetupScripts()
     -- Mouse wheel scaling
     self.frame:SetScript("OnMouseWheel", function(_, delta)
         if IsShiftKeyDown() and not InCombatLockdown() then
-            local currentSize = KnackDB.settings.iconSize or CONSTANTS.ICON.DEFAULT_SIZE
+            local currentSize = KnackDB.settings.iconSize or KnackDefaultSettings.iconSize
             local newSize = math.max(CONSTANTS.ICON.MIN_SIZE, math.min(CONSTANTS.ICON.MAX_SIZE, currentSize + (delta * CONSTANTS.ICON.STEP)))
             KnackDB.settings.iconSize = newSize
             self:UpdateSize()
@@ -214,7 +206,7 @@ function KnackDisplay:ApplyPosition()
 end
 
 function KnackDisplay:UpdateSize()
-    local size = KnackDB.settings.iconSize or CONSTANTS.ICON.DEFAULT_SIZE
+    local size = KnackDB.settings.iconSize or KnackDefaultSettings.iconSize
     self.frame:SetSize(size, size)
     self.icon:SetSize(size - CONSTANTS.ICON.PADDING, size - CONSTANTS.ICON.PADDING)
     self:UpdateBorder()
@@ -229,8 +221,8 @@ function KnackDisplay:UpdateBorder()
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     local texture = (LSM and KnackDB.settings.borderTexture) and LSM:Fetch("border", KnackDB.settings.borderTexture) or "Interface\\Tooltips\\UI-Tooltip-Border"
     
-    local edgeSize = KnackDB.settings.borderWidth or CONSTANTS.BORDER.DEFAULT_WIDTH
-    local offset = KnackDB.settings.borderOffset or CONSTANTS.BORDER.DEFAULT_OFFSET
+    local edgeSize = KnackDB.settings.borderWidth or KnackDefaultSettings.borderWidth
+    local offset = KnackDB.settings.borderOffset or KnackDefaultSettings.borderOffset
     
     self.border:SetBackdrop({
         edgeFile = texture,
@@ -242,14 +234,14 @@ function KnackDisplay:UpdateBorder()
     self.border:SetPoint("TOPLEFT", self.frame, "TOPLEFT", -offset, offset)
     self.border:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", offset, -offset)
     
-    local color = KnackDB.settings.borderColor or CONSTANTS.BORDER.DEFAULT_COLOR
+    local color = KnackDB.settings.borderColor or KnackDefaultSettings.borderColor
     self.border:SetBackdropBorderColor(color.r or color[1], color.g or color[2], color.b or color[3], color.a or color[4])
     self.border:Show()
 end
 
 function KnackDisplay:UpdateFont()
     local fontPath = BindingUtils.GetFontPath(KnackDB.settings.hotkeyFont)
-    local size = KnackDB.settings.hotkeySize or CONSTANTS.FONT.DEFAULT_SIZE
+    local size = KnackDB.settings.hotkeySize or KnackDefaultSettings.hotkeySize
     self.hotkeyText:SetFont(fontPath, size, "OUTLINE")
 end
 
@@ -279,7 +271,7 @@ function KnackDisplay:UpdateGCD()
             self.gcdOverlay:Show()
             self.gcdOverlay:SetCooldown(newStart, newDuration)
             if self.gcdOverlay.SetSwipeColor then
-                self.gcdOverlay:SetSwipeColor(0, 0, 0, KnackDB.settings.gcdOpacity or CONSTANTS.GCD.OPACITY_DEFAULT)
+                self.gcdOverlay:SetSwipeColor(0, 0, 0, KnackDB.settings.gcdOpacity or KnackDefaultSettings.gcdOpacity)
             end
         end
     else
