@@ -24,6 +24,11 @@ local CONSTANTS = {
         SWIPE_COLOR = {r = 0, g = 0, b = 0, a = 1},
         OPACITY_DEFAULT = 0.7
     },
+    BORDER = {
+        DEFAULT_WIDTH = 16,
+        DEFAULT_OFFSET = 2,
+        DEFAULT_COLOR = {r = 1, g = 1, b = 1, a = 1}
+    },
     SCAN_INTERVAL = 0.1,
     MOVE_CURSOR = "Interface\\CURSOR\\UI-Cursor-Move",
     ACTION_BAR = {
@@ -139,6 +144,11 @@ function KnackDisplay:CreateElements()
         self.gcdOverlay:SetSwipeColor(c.r, c.g, c.b, c.a)
     end
     self.gcdOverlay:Hide()
+
+    -- Border
+    self.border = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
+    self.border:SetFrameLevel(self.frame:GetFrameLevel() + 1)
+    self.border:Hide()
 end
 
 function KnackDisplay:SetupScripts()
@@ -207,6 +217,34 @@ function KnackDisplay:UpdateSize()
     local size = KnackDB.settings.iconSize or CONSTANTS.ICON.DEFAULT_SIZE
     self.frame:SetSize(size, size)
     self.icon:SetSize(size - CONSTANTS.ICON.PADDING, size - CONSTANTS.ICON.PADDING)
+    self:UpdateBorder()
+end
+
+function KnackDisplay:UpdateBorder()
+    if not KnackDB.settings.showBorder then
+        self.border:Hide()
+        return
+    end
+
+    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+    local texture = (LSM and KnackDB.settings.borderTexture) and LSM:Fetch("border", KnackDB.settings.borderTexture) or "Interface\\Tooltips\\UI-Tooltip-Border"
+    
+    local edgeSize = KnackDB.settings.borderWidth or CONSTANTS.BORDER.DEFAULT_WIDTH
+    local offset = KnackDB.settings.borderOffset or CONSTANTS.BORDER.DEFAULT_OFFSET
+    
+    self.border:SetBackdrop({
+        edgeFile = texture,
+        edgeSize = edgeSize,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    
+    self.border:ClearAllPoints()
+    self.border:SetPoint("TOPLEFT", self.frame, "TOPLEFT", -offset, offset)
+    self.border:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", offset, -offset)
+    
+    local color = KnackDB.settings.borderColor or CONSTANTS.BORDER.DEFAULT_COLOR
+    self.border:SetBackdropBorderColor(color.r or color[1], color.g or color[2], color.b or color[3], color.a or color[4])
+    self.border:Show()
 end
 
 function KnackDisplay:UpdateFont()
@@ -390,6 +428,7 @@ function KnackUpdateGCDOverlay() Knack.display:UpdateGCD() end
 function KnackUpdateHotkeyFont() Knack.display:UpdateFont() end
 function KnackUpdateHotkeySize() Knack.display:UpdateFont() end
 function KnackUpdateIconSize() Knack.display:UpdateSize() end
+function KnackUpdateBorder() Knack.display:UpdateBorder() end
 function KnackResetPosition() 
     KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = "CENTER", "CENTER", 0, 0 
     Knack.display:ApplyPosition() 

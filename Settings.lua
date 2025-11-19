@@ -43,7 +43,12 @@ function KnackInitializeSettings()
         hotkeyFont = "Friz Quadrata TT", 
         iconSize = 64, 
         showTooltip = true, 
-        hideTooltipInCombat = false
+        hideTooltipInCombat = false,
+        showBorder = false,
+        borderTexture = "Blizzard Tooltip",
+        borderWidth = 16,
+        borderOffset = 2,
+        borderColor = {1, 1, 1, 1}
     }
     for key, value in pairs(defaults) do
         if KnackDB.settings[key] == nil then KnackDB.settings[key] = value end
@@ -58,8 +63,17 @@ function SettingsBuilder:New(name, parent)
     local panel = CreateFrame("Frame", "KnackSettingsPanel", parent)
     panel.name = name
     
+    local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 0, -CONSTANTS.PADDING_LARGE)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -30, CONSTANTS.PADDING_LARGE)
+    
+    local container = CreateFrame("Frame", nil, scrollFrame)
+    container:SetSize(600, 1000)
+    scrollFrame:SetScrollChild(container)
+    
     local self = setmetatable({
         panel = panel,
+        container = container,
         lastAnchor = nil,
         yOffset = -CONSTANTS.PADDING_LARGE,
         spacing = {
@@ -75,11 +89,11 @@ function SettingsBuilder:New(name, parent)
 end
 
 function SettingsBuilder:AddTitle(titleText, subtitleText)
-    local title = self.panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    local title = self.container:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", CONSTANTS.PADDING_LARGE, -CONSTANTS.PADDING_LARGE)
     title:SetText(titleText)
     
-    local subtitle = self.panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    local subtitle = self.container:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -CONSTANTS.PADDING_SMALL)
     subtitle:SetText(subtitleText)
     
@@ -88,7 +102,7 @@ function SettingsBuilder:AddTitle(titleText, subtitleText)
 end
 
 function SettingsBuilder:BeginGroup()
-    local group = CreateFrame("Frame", nil, self.panel, "BackdropTemplate")
+    local group = CreateFrame("Frame", nil, self.container, "BackdropTemplate")
     group:SetPoint("TOPLEFT", self.lastAnchor, "BOTTOMLEFT", 0, self.yOffset)
     group.elements = {}
     group.currentY = -self.spacing.groupTop
@@ -97,7 +111,7 @@ end
 
 function SettingsBuilder:EndGroup(group)
     local totalHeight = math.abs(group.currentY) + self.spacing.groupBottom
-    group:SetSize(420, totalHeight)
+    group:SetSize(580, totalHeight)
     
     group:SetBackdrop({
         bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
@@ -114,7 +128,7 @@ function SettingsBuilder:EndGroup(group)
 end
 
 function SettingsBuilder:AddCheckbox(group, label, tooltip, setting, callback, indent)
-    local check = CreateFrame("CheckButton", "Knack" .. setting:gsub("^%l", string.upper):gsub("%a+", function(w) return w:gsub("^%l", string.upper) end) .. "Check", self.panel, "InterfaceOptionsCheckButtonTemplate")
+    local check = CreateFrame("CheckButton", "Knack" .. setting:gsub("^%l", string.upper):gsub("%a+", function(w) return w:gsub("^%l", string.upper) end) .. "Check", self.container, "InterfaceOptionsCheckButtonTemplate")
     check:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft + (indent or 0), group.currentY)
     check.Text:SetText(label)
     check.tooltipText = tooltip
@@ -126,9 +140,13 @@ function SettingsBuilder:AddCheckbox(group, label, tooltip, setting, callback, i
     return check
 end
 
-function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highText, labelFormat, callback, step)
-    local slider = CreateFrame("Slider", name, self.panel, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft + CONSTANTS.PADDING_SMALL, group.currentY - CONSTANTS.PADDING_LARGE)
+function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highText, labelFormat, callback, step, xOffset, yOverride)
+    local slider = CreateFrame("Slider", name, self.container, "OptionsSliderTemplate")
+    
+    local yPos = yOverride or (group.currentY - CONSTANTS.PADDING_LARGE)
+    local xPos = self.spacing.groupLeft + CONSTANTS.PADDING_SMALL + (xOffset or 0)
+    
+    slider:SetPoint("TOPLEFT", group, "TOPLEFT", xPos, yPos)
     slider:SetMinMaxValues(min, max)
     slider:SetValue(value)
     slider:SetValueStep(step or 1)
@@ -144,13 +162,15 @@ function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highTe
         callback(v) 
     end)
     
-    group.currentY = group.currentY - (CONSTANTS.SLIDER.HEIGHT + self.spacing.item)
+    if not yOverride then
+        group.currentY = group.currentY - (CONSTANTS.SLIDER.HEIGHT + self.spacing.item)
+    end
     table.insert(group.elements, slider)
     return slider
 end
 
 function SettingsBuilder:AddButton(group, text, width, callback)
-    local button = CreateFrame("Button", nil, self.panel, "UIPanelButtonTemplate")
+    local button = CreateFrame("Button", nil, self.container, "UIPanelButtonTemplate")
     button:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
     button:SetSize(width, CONSTANTS.BUTTON_HEIGHT)
     button:SetText(text)
@@ -162,7 +182,7 @@ function SettingsBuilder:AddButton(group, text, width, callback)
 end
 
 function SettingsBuilder:AddText(group, text, color)
-    local fontString = self.panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    local fontString = self.container:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     fontString:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
     fontString:SetText(text)
     if color then
@@ -175,11 +195,11 @@ function SettingsBuilder:AddText(group, text, color)
 end
 
 function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, callback)
-    local label = self.panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    local label = self.container:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     label:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
     label:SetText(labelText)
     
-    local dropdown = CreateFrame("Frame", "KnackFontDropdown", self.panel, "UIDropDownMenuTemplate")
+    local dropdown = CreateFrame("Frame", "KnackFontDropdown", self.container, "UIDropDownMenuTemplate")
     dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft - CONSTANTS.PADDING_LARGE, group.currentY - 20)
     UIDropDownMenu_SetWidth(dropdown, CONSTANTS.DROPDOWN_WIDTH)
     UIDropDownMenu_SetText(dropdown, currentValue)
@@ -214,6 +234,77 @@ function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, call
     return dropdown
 end
 
+function SettingsBuilder:AddColorPicker(group, label, setting, callback, relativeTo)
+    local button = CreateFrame("Button", nil, self.container)
+    button:SetSize(20, 20)
+    
+    if relativeTo then
+        button:SetPoint("LEFT", relativeTo, "RIGHT", 10, 2)
+    else
+        button:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
+        group.currentY = group.currentY - (20 + self.spacing.item)
+    end
+    
+    button.swatch = button:CreateTexture(nil, "OVERLAY")
+    button.swatch:SetAllPoints(button)
+    local r, g, b, a = unpack(KnackDB.settings[setting] or {1, 1, 1, 1})
+    button.swatch:SetColorTexture(r, g, b, a)
+    
+    button.border = button:CreateTexture(nil, "BACKGROUND")
+    button.border:SetPoint("TOPLEFT", button, "TOPLEFT", -1, 1)
+    button.border:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 1, -1)
+    button.border:SetColorTexture(0.5, 0.5, 0.5)
+    
+    button:SetScript("OnClick", function()
+        local r, g, b, a = unpack(KnackDB.settings[setting] or {1, 1, 1, 1})
+        
+        local function OnColorSelect()
+            local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+            local newA = a
+            if ColorPickerFrame.GetColorAlpha then
+                newA = ColorPickerFrame:GetColorAlpha()
+            elseif OpacitySliderFrame then
+                newA = OpacitySliderFrame:GetValue()
+            end
+            
+            KnackDB.settings[setting] = {newR, newG, newB, newA}
+            button.swatch:SetColorTexture(newR, newG, newB, newA)
+            callback(newR, newG, newB, newA)
+        end
+        
+        local function OnCancel()
+            KnackDB.settings[setting] = {r, g, b, a}
+            button.swatch:SetColorTexture(r, g, b, a)
+            callback(r, g, b, a)
+        end
+        
+        if ColorPickerFrame.SetupColorPickerAndShow then
+            local info = {
+                swatchFunc = OnColorSelect,
+                opacityFunc = OnColorSelect,
+                cancelFunc = OnCancel,
+                hasOpacity = true,
+                opacity = a,
+                r = r,
+                g = g,
+                b = b,
+            }
+            ColorPickerFrame:SetupColorPickerAndShow(info)
+        else
+            ColorPickerFrame.func = OnColorSelect
+            ColorPickerFrame.opacityFunc = OnColorSelect
+            ColorPickerFrame.cancelFunc = OnCancel
+            ColorPickerFrame:SetColorRGB(r, g, b)
+            ColorPickerFrame.hasOpacity = true
+            ColorPickerFrame.opacity = a
+            ColorPickerFrame:Show()
+        end
+    end)
+    
+    table.insert(group.elements, button)
+    return button
+end
+
 -- Create the settings panel
 local function CreateSettingsPanel()
     local builder = SettingsBuilder:New("knack", UIParent)
@@ -246,6 +337,51 @@ local function CreateSettingsPanel()
         print("|cff00ff00[knack]|r position reset to center.")
     end)
     builder:EndGroup(iconGroup)
+    
+    -- GROUP 2.5: Border Settings
+    local borderGroup = builder:BeginGroup()
+    builder:AddCheckbox(borderGroup, "Show Border", "Show a border around the icon", "showBorder", function(self)
+        KnackDB.settings.showBorder = self:GetChecked()
+        KnackUpdateBorder()
+    end)
+    
+    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+    local borderList = {}
+    if LSM then
+        for _, borderName in pairs(LSM:List("border")) do
+            table.insert(borderList, borderName)
+        end
+        table.sort(borderList)
+    else
+        borderList = {"Blizzard Tooltip", "Blizzard Dialog"}
+    end
+    
+    local dropdown = builder:AddDropdown(borderGroup, "Border Texture:", borderList, KnackDB.settings.borderTexture or "Blizzard Tooltip", function(val)
+        KnackDB.settings.borderTexture = val
+        KnackUpdateBorder()
+    end)
+    
+    builder:AddColorPicker(borderGroup, "Border Color", "borderColor", function(r, g, b, a)
+        KnackUpdateBorder()
+    end, dropdown)
+    
+    local rowY = borderGroup.currentY
+    
+    builder:AddSlider(borderGroup, "KnackBorderWidthSlider", 1, 64, KnackDB.settings.borderWidth or 16, 
+        "1", "64",
+        function(v) return "Border Thickness: " .. v end,
+        function(v) KnackDB.settings.borderWidth = v KnackUpdateBorder() end,
+        nil, 0, rowY - CONSTANTS.PADDING_LARGE)
+        
+    builder:AddSlider(borderGroup, "KnackBorderOffsetSlider", -20, 20, KnackDB.settings.borderOffset or 2, 
+        "-20", "20",
+        function(v) return "Border Offset: " .. v end,
+        function(v) KnackDB.settings.borderOffset = v KnackUpdateBorder() end,
+        nil, 220, rowY - CONSTANTS.PADDING_LARGE)
+        
+    borderGroup.currentY = rowY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item)
+        
+    builder:EndGroup(borderGroup)
     
     -- GROUP 3: Hotkey Font & Size
     local hotkeyGroup = builder:BeginGroup()
