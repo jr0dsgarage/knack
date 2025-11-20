@@ -248,41 +248,23 @@ end
 function KnackDisplay:UpdateGCD()
     if not KnackDB.settings.showGCD then
         self.gcdOverlay:Hide()
-        self.lastGCDStart = 0
-        self.lastGCDDuration = 0
         return
     end
 
     local gcd = C_Spell.GetSpellCooldown(CONSTANTS.GCD.SPELL_ID)
-    local now = GetTime()
     
-    local newStart = (gcd and gcd.startTime) or 0
-    local newDuration = (gcd and gcd.duration) or 0
-    
-    -- Check if we are currently animating a valid GCD
-    local isAnimating = (self.lastGCDStart + self.lastGCDDuration) > now
-
-    if newDuration > 0 then
-        -- New valid GCD data
-        -- Update if start time has changed significantly (tolerance for jitter)
-        if math.abs(newStart - self.lastGCDStart) > 0.05 then
-            self.lastGCDStart = newStart
-            self.lastGCDDuration = newDuration
-            self.gcdOverlay:Show()
-            self.gcdOverlay:SetCooldown(newStart, newDuration)
-            if self.gcdOverlay.SetSwipeColor then
-                self.gcdOverlay:SetSwipeColor(0, 0, 0, KnackDB.settings.gcdOpacity or KnackDefaultSettings.gcdOpacity)
-            end
+    if gcd then
+        self.gcdOverlay:Show()
+        if self.gcdOverlay.SetSwipeColor then
+            self.gcdOverlay:SetSwipeColor(0, 0, 0, KnackDB.settings.gcdOpacity or KnackDefaultSettings.gcdOpacity)
         end
+        
+        -- Blindly pass values to SetCooldown. 
+        -- We cannot check them or compare them if they are secrets.
+        -- We rely on SetCooldown to handle secret values and '0' duration.
+        pcall(self.gcdOverlay.SetCooldown, self.gcdOverlay, gcd.startTime, gcd.duration)
     else
-        -- No GCD data (or cleared)
-        -- Only hide if we are NOT currently animating a previous GCD
-        -- This prevents flickering if the API briefly reports 0, or if the user wants to see the full swipe
-        if not isAnimating then
-            self.gcdOverlay:Hide()
-            self.lastGCDStart = 0
-            self.lastGCDDuration = 0
-        end
+        self.gcdOverlay:Hide()
     end
 end
 
@@ -318,7 +300,7 @@ function KnackDisplay:Update(spellID)
     self.hotkeyText:SetTextColor(color.r, color.g, color.b, color.a)
 
     -- Update GCD
-    self:UpdateGCD()
+    -- self:UpdateGCD()
 
     self.frame:Show()
 end
@@ -343,6 +325,7 @@ function Knack:SetupEvents()
     eventFrame:RegisterEvent("ADDON_LOADED")
     eventFrame:RegisterEvent("PLAYER_LOGIN")
     eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+    eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
     
     eventFrame:SetScript("OnEvent", function(_, event, arg1)
         if event == "ADDON_LOADED" and arg1 == addonName then
@@ -351,6 +334,8 @@ function Knack:SetupEvents()
             self.display:ApplyPosition()
         elseif event == "PLAYER_TARGET_CHANGED" then
             self:Update()
+        elseif event == "SPELL_UPDATE_COOLDOWN" then
+            self.display:UpdateGCD()
         end
     end)
 end
@@ -358,6 +343,7 @@ end
 function Knack:OnLoad()
     self.display:UpdateSize()
     self.display:UpdateFont()
+    self.display:UpdateGCD()
     print("|cff00ff00[knack]|r loaded. Hold SHIFT to move the icon.")
 end
 
