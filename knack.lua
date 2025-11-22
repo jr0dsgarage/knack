@@ -49,7 +49,13 @@ function BindingUtils.GetBindingNameForSlot(slot)
             return bar.binding .. button
         end
     end
-    return "ACTIONBUTTON" .. button -- Bar 1 (slots 1-12)
+    
+    -- Only map slots 1-12 to ACTIONBUTTON bindings to avoid duplicates from stance/bonus bars
+    if slot <= CONSTANTS.ACTION_BAR.BUTTONS_PER_BAR then
+        return "ACTIONBUTTON" .. button -- Bar 1 (slots 1-12)
+    end
+    
+    return nil
 end
 
 function BindingUtils.SelectBinding(b1, b2)
