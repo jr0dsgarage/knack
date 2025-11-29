@@ -34,6 +34,21 @@ local CONSTANTS = {
 KnackDefaultSettings = {
     enabled = true, 
     onlyWithEnemyTarget = false, 
+    attachToNameplate = false,
+    nameplateAnchor = "TOP",
+    nameplateIconSize = 32,
+    nameplateOffset = 0,
+    nameplateShowBorder = false,
+    nameplateBorderTexture = "Blizzard Tooltip",
+    nameplateBorderWidth = 16,
+    nameplateBorderOffset = 2,
+    nameplateBorderColor = {1, 1, 1, 1},
+    nameplateHotkeyFont = "Friz Quadrata TT",
+    nameplateHotkeySize = 10,
+    nameplateShowTooltip = false,
+    nameplateHideTooltipInCombat = false,
+    nameplateShowGCD = true,
+    nameplateGCDOpacity = 0.7,
     showGCD = true, 
     gcdOpacity = 0.7, 
     hotkeySize = 14, 
@@ -321,6 +336,128 @@ local function CreateSettingsPanel()
         KnackDB.settings.onlyWithEnemyTarget = self:GetChecked()
     end)
     builder:EndGroup(enableGroup)
+
+    -- GROUP 1.5: Nameplate Integration (Only if 'next' is loaded)
+    if C_AddOns.IsAddOnLoaded("next") then
+        local nameplateGroup = builder:BeginGroup()
+        builder:AddCheckbox(nameplateGroup, "Attach copy to Nameplate", "Attach a copy of the icon to the current target's nameplate", "attachToNameplate", function(self)
+            KnackDB.settings.attachToNameplate = self:GetChecked()
+            if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
+        end)
+
+        local anchorPoints = {"TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT"}
+        local dropdown = builder:AddDropdown(nameplateGroup, "Anchor Point:", anchorPoints, KnackDB.settings.nameplateAnchor or "TOP", function(val)
+            KnackDB.settings.nameplateAnchor = val
+            if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
+        end)
+
+        -- Add slider to the right of the dropdown
+        local rowY = nameplateGroup.currentY - CONSTANTS.PADDING_LARGE
+        builder:AddSlider(nameplateGroup, "KnackNameplateIconSizeSlider", 18, 64, KnackDB.settings.nameplateIconSize or 32, 
+            "18", "64",
+            function(v) return "Size: " .. v end,
+            function(v) 
+                KnackDB.settings.nameplateIconSize = v 
+                if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
+            end,
+            nil, 0, rowY)
+
+        builder:AddSlider(nameplateGroup, "KnackNameplateOffsetSlider", 0, 13, KnackDB.settings.nameplateOffset or 0, 
+            "0", "13",
+            function(v) return "Offset: " .. v end,
+            function(v) 
+                KnackDB.settings.nameplateOffset = v 
+                if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
+            end,
+            nil, 220, rowY)
+            
+        nameplateGroup.currentY = nameplateGroup.currentY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item) - CONSTANTS.PADDING_LARGE
+
+        -- Nameplate Border
+        builder:AddCheckbox(nameplateGroup, "Show Border", "Show a border around the nameplate icon", "nameplateShowBorder", function(self)
+            KnackDB.settings.nameplateShowBorder = self:GetChecked()
+            if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end
+        end)
+
+        local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+        local borderList = {}
+        if LSM then
+            for _, borderName in pairs(LSM:List("border")) do
+                table.insert(borderList, borderName)
+            end
+            table.sort(borderList)
+        else
+            borderList = {"Blizzard Tooltip", "Blizzard Dialog"}
+        end
+
+        local npDropdown = builder:AddDropdown(nameplateGroup, "Border Texture:", borderList, KnackDB.settings.nameplateBorderTexture or "Blizzard Tooltip", function(val)
+            KnackDB.settings.nameplateBorderTexture = val
+            if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end
+        end)
+
+        builder:AddColorPicker(nameplateGroup, "Border Color", "nameplateBorderColor", function(r, g, b, a)
+            if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end
+        end, npDropdown)
+
+        local npRowY = nameplateGroup.currentY
+        builder:AddSlider(nameplateGroup, "KnackNameplateBorderWidthSlider", 1, 64, KnackDB.settings.nameplateBorderWidth or 16, 
+            "1", "64",
+            function(v) return "Border Thickness: " .. v end,
+            function(v) KnackDB.settings.nameplateBorderWidth = v; if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end end,
+            nil, 0, npRowY - CONSTANTS.PADDING_LARGE)
+            
+        builder:AddSlider(nameplateGroup, "KnackNameplateBorderOffsetSlider", -20, 20, KnackDB.settings.nameplateBorderOffset or 2, 
+            "-20", "20",
+            function(v) return "Border Offset: " .. v end,
+            function(v) KnackDB.settings.nameplateBorderOffset = v; if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end end,
+            nil, 220, npRowY - CONSTANTS.PADDING_LARGE)
+            
+        nameplateGroup.currentY = npRowY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item)
+
+        -- Nameplate Hotkey
+        local fontList = {}
+        if LSM then
+            for _, fontName in pairs(LSM:List("font")) do
+                table.insert(fontList, fontName)
+            end
+            table.sort(fontList)
+        else
+            fontList = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
+        end
+        
+        builder:AddDropdown(nameplateGroup, "Hotkey Font:", fontList, KnackDB.settings.nameplateHotkeyFont or "Friz Quadrata TT", function(fontName)
+            KnackDB.settings.nameplateHotkeyFont = fontName
+            if KnackUpdateHotkeyFont then KnackUpdateHotkeyFont() end
+        end)
+        
+        builder:AddSlider(nameplateGroup, "KnackNameplateHotkeySizeSlider", CONSTANTS.SLIDER.HOTKEY_MIN, CONSTANTS.SLIDER.HOTKEY_MAX, KnackDB.settings.nameplateHotkeySize or 10, 
+            tostring(CONSTANTS.SLIDER.HOTKEY_MIN), tostring(CONSTANTS.SLIDER.HOTKEY_MAX),
+            function(v) return "Hotkey Font Size: " .. v end,
+            function(v) KnackDB.settings.nameplateHotkeySize = v; if KnackUpdateHotkeyFont then KnackUpdateHotkeyFont() end end)
+
+        -- Nameplate Tooltip
+        builder:AddCheckbox(nameplateGroup, "Show tooltip", "Display the spell tooltip when hovering over the nameplate icon", "nameplateShowTooltip", function(self)
+            KnackDB.settings.nameplateShowTooltip = self:GetChecked()
+        end)
+        
+        builder:AddCheckbox(nameplateGroup, "Hide tooltip in combat", "Only show tooltip when out of combat", "nameplateHideTooltipInCombat", function(self)
+            KnackDB.settings.nameplateHideTooltipInCombat = self:GetChecked()
+        end)
+
+        -- Nameplate GCD
+        builder:AddCheckbox(nameplateGroup, "Show GCD overlay", "Display a darkening overlay on the icon during global cooldown", "nameplateShowGCD", function(self)
+            KnackDB.settings.nameplateShowGCD = self:GetChecked()
+            if KnackUpdateGCDOverlay then KnackUpdateGCDOverlay() end
+        end)
+        
+        builder:AddSlider(nameplateGroup, "KnackNameplateGCDOpacitySlider", CONSTANTS.SLIDER.GCD_MIN, CONSTANTS.SLIDER.GCD_MAX, KnackDB.settings.nameplateGCDOpacity or 0.7, 
+            tostring(CONSTANTS.SLIDER.GCD_MIN) .. "%", tostring(CONSTANTS.SLIDER.GCD_MAX * 100) .. "%",
+            function(v) return "GCD Opacity: " .. math.floor(v * 100) .. "%" end,
+            function(v) KnackDB.settings.nameplateGCDOpacity = v; if KnackUpdateGCDOverlay then KnackUpdateGCDOverlay() end end,
+            CONSTANTS.SLIDER.GCD_STEP)
+
+        builder:EndGroup(nameplateGroup)
+    end
     
     -- GROUP 2: Icon Size, Reset Position & Instructions
     local iconGroup = builder:BeginGroup()

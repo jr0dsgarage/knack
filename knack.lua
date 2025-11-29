@@ -147,6 +147,36 @@ function KnackDisplay:CreateElements()
     self.border = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
     self.border:SetFrameLevel(self.frame:GetFrameLevel() + 1)
     self.border:Hide()
+
+    -- Nameplate Frame (Copy)
+    self.nameplateFrame = CreateFrame("Frame", "KnackNameplateFrame", UIParent)
+    self.nameplateFrame:SetSize(CONSTANTS.ICON.MIN_SIZE, CONSTANTS.ICON.MIN_SIZE)
+    self.nameplateFrame:Hide()
+    
+    self.nameplateFrame.icon = self.nameplateFrame:CreateTexture(nil, "ARTWORK")
+    self.nameplateFrame.icon:SetAllPoints(self.nameplateFrame)
+    self.nameplateFrame.icon:SetTexCoord(CONSTANTS.ICON.TEXTURE_INSET, CONSTANTS.ICON.TEXTURE_OUTER, CONSTANTS.ICON.TEXTURE_INSET, CONSTANTS.ICON.TEXTURE_OUTER)
+
+    self.nameplateFrame.gcdOverlay = CreateFrame("Cooldown", nil, self.nameplateFrame, "CooldownFrameTemplate")
+    self.nameplateFrame.gcdOverlay:SetAllPoints(self.nameplateFrame.icon)
+    self.nameplateFrame.gcdOverlay:SetDrawEdge(false)
+    self.nameplateFrame.gcdOverlay:SetDrawSwipe(true)
+    self.nameplateFrame.gcdOverlay:SetReverse(false)
+    self.nameplateFrame.gcdOverlay:SetHideCountdownNumbers(true)
+    if self.nameplateFrame.gcdOverlay.SetSwipeColor then
+        local c = CONSTANTS.GCD.SWIPE_COLOR
+        self.nameplateFrame.gcdOverlay:SetSwipeColor(c.r, c.g, c.b, c.a)
+    end
+    self.nameplateFrame.gcdOverlay:Hide()
+
+    -- Nameplate Hotkey Text
+    self.nameplateFrame.hotkeyText = self.nameplateFrame:CreateFontString(nil, "OVERLAY")
+    self.nameplateFrame.hotkeyText:SetPoint("TOPRIGHT", self.nameplateFrame.icon, "TOPRIGHT", CONSTANTS.FONT.OFFSET, CONSTANTS.FONT.OFFSET)
+
+    -- Nameplate Border
+    self.nameplateFrame.border = CreateFrame("Frame", nil, self.nameplateFrame, "BackdropTemplate")
+    self.nameplateFrame.border:SetFrameLevel(self.nameplateFrame:GetFrameLevel() + 1)
+    self.nameplateFrame.border:Hide()
 end
 
 function KnackDisplay:SetupScripts()
@@ -185,12 +215,26 @@ function KnackDisplay:SetupScripts()
     -- Tooltip
     self.frame:SetScript("OnEnter", function() self:ShowTooltip() end)
     self.frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Nameplate Tooltip
+    self.nameplateFrame:SetScript("OnEnter", function() self:ShowNameplateTooltip() end)
+    self.nameplateFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
 function KnackDisplay:ShowTooltip()
     if KnackDB.settings.showTooltip and self.currentSpellID then
         if not KnackDB.settings.hideTooltipInCombat or not InCombatLockdown() then
             GameTooltip:SetOwner(self.frame, "ANCHOR_RIGHT")
+            GameTooltip:SetSpellByID(self.currentSpellID)
+            GameTooltip:Show()
+        end
+    end
+end
+
+function KnackDisplay:ShowNameplateTooltip()
+    if KnackDB.settings.nameplateShowTooltip and self.currentSpellID then
+        if not KnackDB.settings.nameplateHideTooltipInCombat or not InCombatLockdown() then
+            GameTooltip:SetOwner(self.nameplateFrame, "ANCHOR_RIGHT")
             GameTooltip:SetSpellByID(self.currentSpellID)
             GameTooltip:Show()
         end
@@ -237,8 +281,8 @@ function KnackDisplay:UpdateBorder()
     })
     
     self.border:ClearAllPoints()
-    self.border:SetPoint("TOPLEFT", self.frame, "TOPLEFT", -offset, offset)
-    self.border:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", offset, -offset)
+    self.border:SetPoint("TOPLEFT", self.frame, "TOPLEFT", -(offset + edgeSize), (offset + edgeSize))
+    self.border:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", (offset + edgeSize), -(offset + edgeSize))
     
     local color = KnackDB.settings.borderColor or KnackDefaultSettings.borderColor
     self.border:SetBackdropBorderColor(color.r or color[1], color.g or color[2], color.b or color[3], color.a or color[4])
@@ -249,6 +293,12 @@ function KnackDisplay:UpdateFont()
     local fontPath = BindingUtils.GetFontPath(KnackDB.settings.hotkeyFont)
     local size = KnackDB.settings.hotkeySize or KnackDefaultSettings.hotkeySize
     self.hotkeyText:SetFont(fontPath, size, "OUTLINE")
+    
+    if self.nameplateFrame and self.nameplateFrame.hotkeyText then
+        local npFontPath = BindingUtils.GetFontPath(KnackDB.settings.nameplateHotkeyFont)
+        local npSize = KnackDB.settings.nameplateHotkeySize or KnackDefaultSettings.nameplateHotkeySize
+        self.nameplateFrame.hotkeyText:SetFont(npFontPath, npSize, "OUTLINE")
+    end
 end
 
 function KnackDisplay:UpdateGCD()
@@ -269,9 +319,98 @@ function KnackDisplay:UpdateGCD()
         -- We cannot check them or compare them if they are secrets.
         -- We rely on SetCooldown to handle secret values and '0' duration.
         pcall(self.gcdOverlay.SetCooldown, self.gcdOverlay, gcd.startTime, gcd.duration)
+
+        -- Update Nameplate GCD
+        if self.nameplateFrame and self.nameplateFrame.gcdOverlay then
+            if KnackDB.settings.nameplateShowGCD then
+                self.nameplateFrame.gcdOverlay:Show()
+                if self.nameplateFrame.gcdOverlay.SetSwipeColor then
+                    self.nameplateFrame.gcdOverlay:SetSwipeColor(0, 0, 0, KnackDB.settings.nameplateGCDOpacity or KnackDefaultSettings.nameplateGCDOpacity)
+                end
+                pcall(self.nameplateFrame.gcdOverlay.SetCooldown, self.nameplateFrame.gcdOverlay, gcd.startTime, gcd.duration)
+            else
+                self.nameplateFrame.gcdOverlay:Hide()
+            end
+        end
     else
         self.gcdOverlay:Hide()
+        if self.nameplateFrame and self.nameplateFrame.gcdOverlay then
+            self.nameplateFrame.gcdOverlay:Hide()
+        end
     end
+end
+
+function KnackDisplay:UpdateNameplateAttachment()
+    if not KnackDB.settings.attachToNameplate then
+        self.nameplateFrame:Hide()
+        return
+    end
+
+    if not UnitExists("target") then
+        self.nameplateFrame:Hide()
+        return
+    end
+
+    local nameplate = C_NamePlate.GetNamePlateForUnit("target")
+    if nameplate then
+        self.nameplateFrame:SetParent(nameplate)
+        self.nameplateFrame:ClearAllPoints()
+        
+        local anchor = KnackDB.settings.nameplateAnchor or "TOP"
+        local offset = (KnackDB.settings.nameplateOffset or 0) - 13
+        local p, rP, x, y = anchor, anchor, 0, 0
+        
+        if anchor == "TOP" then p = "BOTTOM"; rP = "TOP"; y = offset
+        elseif anchor == "BOTTOM" then p = "TOP"; rP = "BOTTOM"; y = -offset
+        elseif anchor == "LEFT" then p = "RIGHT"; rP = "LEFT"; x = -2 - offset
+        elseif anchor == "RIGHT" then p = "LEFT"; rP = "RIGHT"; x = 2 + offset
+        elseif anchor == "TOPLEFT" then p = "BOTTOMRIGHT"; rP = "TOPLEFT"; x = -offset; y = offset
+        elseif anchor == "TOPRIGHT" then p = "BOTTOMLEFT"; rP = "TOPRIGHT"; x = offset; y = offset
+        elseif anchor == "BOTTOMLEFT" then p = "TOPRIGHT"; rP = "BOTTOMLEFT"; x = -offset; y = -offset
+        elseif anchor == "BOTTOMRIGHT" then p = "TOPLEFT"; rP = "BOTTOMRIGHT"; x = offset; y = -offset
+        end
+        
+        self.nameplateFrame:SetPoint(p, nameplate, rP, x, y)
+        self.nameplateFrame:Show()
+        
+        local size = KnackDB.settings.nameplateIconSize or 32
+        self.nameplateFrame:SetSize(size, size)
+        self.nameplateFrame.icon:SetSize(size - CONSTANTS.ICON.PADDING, size - CONSTANTS.ICON.PADDING)
+        
+        -- Update font size when nameplate icon size changes
+        self:UpdateFont()
+    else
+        self.nameplateFrame:Hide()
+    end
+end
+
+function KnackDisplay:UpdateNameplateBorder()
+    if not self.nameplateFrame or not self.nameplateFrame.border then return end
+
+    if not KnackDB.settings.nameplateShowBorder then
+        self.nameplateFrame.border:Hide()
+        return
+    end
+
+    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+    local texture = (LSM and KnackDB.settings.nameplateBorderTexture) and LSM:Fetch("border", KnackDB.settings.nameplateBorderTexture) or "Interface\\Tooltips\\UI-Tooltip-Border"
+    
+    local edgeSize = KnackDB.settings.nameplateBorderWidth or KnackDefaultSettings.nameplateBorderWidth
+    local offset = KnackDB.settings.nameplateBorderOffset or KnackDefaultSettings.nameplateBorderOffset
+    
+    self.nameplateFrame.border:SetBackdrop({
+        edgeFile = texture,
+        edgeSize = edgeSize,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    
+    self.nameplateFrame.border:ClearAllPoints()
+    self.nameplateFrame.border:SetPoint("TOPLEFT", self.nameplateFrame, "TOPLEFT", -(offset + edgeSize), (offset + edgeSize))
+    self.nameplateFrame.border:SetPoint("BOTTOMRIGHT", self.nameplateFrame, "BOTTOMRIGHT", (offset + edgeSize), -(offset + edgeSize))
+    
+    local color = KnackDB.settings.nameplateBorderColor or KnackDefaultSettings.nameplateBorderColor
+    self.nameplateFrame.border:SetBackdropBorderColor(color.r or color[1], color.g or color[2], color.b or color[3], color.a or color[4])
+    self.nameplateFrame.border:Show()
 end
 
 function KnackDisplay:Update(spellID)
@@ -293,6 +432,13 @@ function KnackDisplay:Update(spellID)
     self.currentSpellID = spellID
     self.icon:SetTexture(spellInfo.iconID)
     
+    -- Update Nameplate Copy
+    if self.nameplateFrame then
+        self.nameplateFrame.icon:SetTexture(spellInfo.iconID)
+        self:UpdateNameplateAttachment()
+        self:UpdateNameplateBorder()
+    end
+    
     -- Update Tooltip if needed
     if spellChanged and GameTooltip:IsOwned(self.frame) and GameTooltip:IsShown() then
         self:ShowTooltip()
@@ -304,6 +450,12 @@ function KnackDisplay:Update(spellID)
     
     local color = inRange and CONSTANTS.FONT.COLOR_IN_RANGE or CONSTANTS.FONT.COLOR_OUT_OF_RANGE
     self.hotkeyText:SetTextColor(color.r, color.g, color.b, color.a)
+
+    -- Update Nameplate Hotkey
+    if self.nameplateFrame and self.nameplateFrame.hotkeyText then
+        self.nameplateFrame.hotkeyText:SetText(hotkey)
+        self.nameplateFrame.hotkeyText:SetTextColor(color.r, color.g, color.b, color.a)
+    end
 
     -- Update GCD
     -- self:UpdateGCD()
@@ -332,6 +484,8 @@ function Knack:SetupEvents()
     eventFrame:RegisterEvent("PLAYER_LOGIN")
     eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
     eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+    eventFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+    eventFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
     
     eventFrame:SetScript("OnEvent", function(_, event, arg1)
         if event == "ADDON_LOADED" and arg1 == addonName then
@@ -340,8 +494,11 @@ function Knack:SetupEvents()
             self.display:ApplyPosition()
         elseif event == "PLAYER_TARGET_CHANGED" then
             self:Update()
+            self.display:UpdateNameplateAttachment()
         elseif event == "SPELL_UPDATE_COOLDOWN" then
             self.display:UpdateGCD()
+        elseif event == "NAME_PLATE_UNIT_ADDED" or event == "NAME_PLATE_UNIT_REMOVED" then
+            self.display:UpdateNameplateAttachment()
         end
     end)
 end
@@ -416,4 +573,16 @@ function KnackUpdateBorder() Knack.display:UpdateBorder() end
 function KnackResetPosition() 
     KnackDB.point, KnackDB.relativePoint, KnackDB.xOfs, KnackDB.yOfs = "CENTER", "CENTER", 0, 0 
     Knack.display:ApplyPosition() 
+end
+
+function KnackUpdateNameplateAttachment()
+    if Knack.display then
+        Knack.display:UpdateNameplateAttachment()
+    end
+end
+
+function KnackUpdateNameplateBorder()
+    if Knack.display then
+        Knack.display:UpdateNameplateBorder()
+    end
 end
