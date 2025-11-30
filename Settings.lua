@@ -10,8 +10,8 @@ local CONSTANTS = {
     SLIDER = {
         WIDTH = 200,
         HEIGHT = 48,
-        ICON_MIN = 24,
-        ICON_MAX = 128,
+        ICON_MIN = 18,
+        ICON_MAX = 64,
         HOTKEY_MIN = 8,
         HOTKEY_MAX = 32,
         GCD_MIN = 0,
@@ -51,6 +51,17 @@ KnackDefaultSettings = {
     nameplateGCDOpacity = 0.7,
     showGCD = true, 
     gcdOpacity = 0.7, 
+    showCastSweep = true,
+    showCastGlow = true,
+    showChannelSweep = true,
+    showChannelGlow = true,
+    
+    -- Nameplate Defaults
+    nameplateShowCastSweep = true,
+    nameplateShowCastGlow = true,
+    nameplateShowChannelSweep = true,
+    nameplateShowChannelGlow = true,
+    
     hotkeySize = 14, 
     hotkeyFont = "Friz Quadrata TT", 
     iconSize = 64, 
@@ -69,6 +80,48 @@ function KnackInitializeSettings()
     for key, value in pairs(KnackDefaultSettings) do
         if KnackDB.settings[key] == nil then KnackDB.settings[key] = value end
     end
+end
+
+-- Profile Management
+local currentProfile = "Main Display"
+local profiles = {
+    { name = "Main Display", prefix = "" },
+    { name = "Nameplate Display", prefix = "nameplate" }
+}
+
+local globalKeys = {
+    ["enabled"] = true,
+    ["onlyWithEnemyTarget"] = true,
+    ["attachToNameplate"] = true
+}
+
+local function GetSettingKey(baseKey)
+    if globalKeys[baseKey] then return baseKey end
+
+    local profile = nil
+    for _, p in ipairs(profiles) do
+        if p.name == currentProfile then profile = p break end
+    end
+    
+    if not profile then return baseKey end
+    
+    if profile.prefix == "" then
+        -- Lowercase first letter for main profile (e.g. "IconSize" -> "iconSize")
+        return baseKey:gsub("^%u", string.lower)
+    else
+        -- Prefix + Uppercase first letter (e.g. "IconSize" -> "nameplateIconSize")
+        return profile.prefix .. baseKey:gsub("^%l", string.upper)
+    end
+end
+
+local function GetSetting(baseKey)
+    local key = GetSettingKey(baseKey)
+    return KnackDB.settings[key]
+end
+
+local function SetSetting(baseKey, value)
+    local key = GetSettingKey(baseKey)
+    KnackDB.settings[key] = value
 end
 
 -- UI Builder Class
@@ -98,7 +151,8 @@ function SettingsBuilder:New(name, parent)
             groupBottom = 6,
             groupLeft = 10,
             item = 4
-        }
+        },
+        controls = {} -- Store controls for updates
     }, SettingsBuilder)
     
     return self
@@ -144,19 +198,24 @@ function SettingsBuilder:EndGroup(group)
 end
 
 function SettingsBuilder:AddCheckbox(group, label, tooltip, setting, callback, indent)
-    local check = CreateFrame("CheckButton", "Knack" .. setting:gsub("^%l", string.upper):gsub("%a+", function(w) return w:gsub("^%l", string.upper) end) .. "Check", self.container, "InterfaceOptionsCheckButtonTemplate")
+    local check = CreateFrame("CheckButton", nil, self.container, "InterfaceOptionsCheckButtonTemplate")
     check:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft + (indent or 0), group.currentY)
     check.Text:SetText(label)
     check.tooltipText = tooltip
-    check:SetChecked(KnackDB.settings[setting])
     check:SetScript("OnClick", callback)
+    check:SetFrameLevel(group:GetFrameLevel() + 1)
+    
+    if setting then
+        check.settingKey = setting
+        table.insert(self.controls, check)
+    end
     
     group.currentY = group.currentY - (check:GetHeight() + self.spacing.item)
     table.insert(group.elements, check)
     return check
 end
 
-function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highText, labelFormat, callback, step, xOffset, yOverride)
+function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highText, labelFormat, callback, step, xOffset, yOverride, setting)
     local slider = CreateFrame("Slider", name, self.container, "OptionsSliderTemplate")
     
     local yPos = yOverride or (group.currentY - CONSTANTS.PADDING_LARGE)
@@ -164,19 +223,27 @@ function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highTe
     
     slider:SetPoint("TOPLEFT", group, "TOPLEFT", xPos, yPos)
     slider:SetMinMaxValues(min, max)
-    slider:SetValue(value)
+    slider:SetValue(value or min)
     slider:SetValueStep(step or 1)
     slider:SetObeyStepOnDrag(true)
     slider:SetWidth(CONSTANTS.SLIDER.WIDTH)
+    slider:SetFrameLevel(group:GetFrameLevel() + 1)
     
     _G[name .. "Low"]:SetText(lowText)
     _G[name .. "High"]:SetText(highText)
-    _G[name .. "Text"]:SetText(labelFormat(value))
+    _G[name .. "Text"]:SetText(labelFormat(value or min))
     
     slider:SetScript("OnValueChanged", function(self, v) 
         _G[name .. "Text"]:SetText(labelFormat(v)) 
         callback(v) 
     end)
+    
+    if setting then
+        slider.settingKey = setting
+        slider.labelFormat = labelFormat
+        slider.name = name
+        table.insert(self.controls, slider)
+    end
     
     if not yOverride then
         group.currentY = group.currentY - (CONSTANTS.SLIDER.HEIGHT + self.spacing.item)
@@ -191,6 +258,7 @@ function SettingsBuilder:AddButton(group, text, width, callback)
     button:SetSize(width, CONSTANTS.BUTTON_HEIGHT)
     button:SetText(text)
     button:SetScript("OnClick", callback)
+    button:SetFrameLevel(group:GetFrameLevel() + 1)
     
     group.currentY = group.currentY - (button:GetHeight() + self.spacing.item)
     table.insert(group.elements, button)
@@ -198,7 +266,7 @@ function SettingsBuilder:AddButton(group, text, width, callback)
 end
 
 function SettingsBuilder:AddText(group, text, color)
-    local fontString = self.container:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    local fontString = group:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     fontString:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
     fontString:SetText(text)
     if color then
@@ -210,19 +278,36 @@ function SettingsBuilder:AddText(group, text, color)
     return fontString
 end
 
-function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, callback)
-    local label = self.container:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+function SettingsBuilder:AddHeader(group, text)
+    group.currentY = group.currentY - 8
+    local fontString = group:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    fontString:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
+    fontString:SetText(text)
+    
+    group.currentY = group.currentY - (fontString:GetHeight() + self.spacing.item)
+    table.insert(group.elements, fontString)
+    return fontString
+end
+
+function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, callback, setting)
+    local label = group:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     label:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
     label:SetText(labelText)
     
-    local dropdown = CreateFrame("Frame", "KnackFontDropdown", self.container, "UIDropDownMenuTemplate")
+    local dropdown = CreateFrame("Frame", "KnackDropdown" .. (setting or math.random(1000)), self.container, "UIDropDownMenuTemplate")
     dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft - CONSTANTS.PADDING_LARGE, group.currentY - 20)
     UIDropDownMenu_SetWidth(dropdown, CONSTANTS.DROPDOWN_WIDTH)
     UIDropDownMenu_SetText(dropdown, currentValue)
+    dropdown:SetFrameLevel(group:GetFrameLevel() + 1)
     
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     
-    UIDropDownMenu_Initialize(dropdown, function(self, level)
+    local function InitializeDropdown(self, level)
+        local selectedValue = currentValue
+        if setting then
+            selectedValue = GetSetting(setting)
+        end
+
         for _, item in ipairs(items) do
             local info = UIDropDownMenu_CreateInfo()
             info.text = item
@@ -230,7 +315,7 @@ function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, call
                 UIDropDownMenu_SetText(dropdown, item)
                 callback(item)
             end
-            info.checked = (item == currentValue)
+            info.checked = (item == selectedValue)
             
             if LSM then
                 local fontPath = LSM:Fetch("font", item)
@@ -242,7 +327,18 @@ function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, call
             
             UIDropDownMenu_AddButton(info)
         end
-    end)
+    end
+    
+    UIDropDownMenu_Initialize(dropdown, InitializeDropdown)
+    
+    if setting then
+        dropdown.settingKey = setting
+        dropdown.items = items
+        dropdown.InitializeDropdown = InitializeDropdown
+        table.insert(self.controls, dropdown)
+    end
+    
+    dropdown.label = label
     
     group.currentY = group.currentY - CONSTANTS.DROPDOWN_HEIGHT
     table.insert(group.elements, label)
@@ -253,6 +349,7 @@ end
 function SettingsBuilder:AddColorPicker(group, label, setting, callback, relativeTo)
     local button = CreateFrame("Button", nil, self.container)
     button:SetSize(20, 20)
+    button:SetFrameLevel(group:GetFrameLevel() + 1)
     
     if relativeTo then
         button:SetPoint("LEFT", relativeTo, "RIGHT", 10, 2)
@@ -263,7 +360,7 @@ function SettingsBuilder:AddColorPicker(group, label, setting, callback, relativ
     
     button.swatch = button:CreateTexture(nil, "OVERLAY")
     button.swatch:SetAllPoints(button)
-    local r, g, b, a = unpack(KnackDB.settings[setting] or {1, 1, 1, 1})
+    local r, g, b, a = unpack(GetSetting(setting) or {1, 1, 1, 1})
     button.swatch:SetColorTexture(r, g, b, a)
     
     button.border = button:CreateTexture(nil, "BACKGROUND")
@@ -272,7 +369,7 @@ function SettingsBuilder:AddColorPicker(group, label, setting, callback, relativ
     button.border:SetColorTexture(0.5, 0.5, 0.5)
     
     button:SetScript("OnClick", function()
-        local r, g, b, a = unpack(KnackDB.settings[setting] or {1, 1, 1, 1})
+        local r, g, b, a = unpack(GetSetting(setting) or {1, 1, 1, 1})
         
         local function OnColorSelect()
             local newR, newG, newB = ColorPickerFrame:GetColorRGB()
@@ -283,13 +380,13 @@ function SettingsBuilder:AddColorPicker(group, label, setting, callback, relativ
                 newA = OpacitySliderFrame:GetValue()
             end
             
-            KnackDB.settings[setting] = {newR, newG, newB, newA}
+            SetSetting(setting, {newR, newG, newB, newA})
             button.swatch:SetColorTexture(newR, newG, newB, newA)
             callback(newR, newG, newB, newA)
         end
         
         local function OnCancel()
-            KnackDB.settings[setting] = {r, g, b, a}
+            SetSetting(setting, {r, g, b, a})
             button.swatch:SetColorTexture(r, g, b, a)
             callback(r, g, b, a)
         end
@@ -317,171 +414,230 @@ function SettingsBuilder:AddColorPicker(group, label, setting, callback, relativ
         end
     end)
     
+    if setting then
+        button.settingKey = setting
+        table.insert(self.controls, button)
+    end
+    
     table.insert(group.elements, button)
     return button
+end
+
+function SettingsBuilder:BeginSubGroup(parentGroup)
+    local group = CreateFrame("Frame", nil, parentGroup, "BackdropTemplate")
+    local width = 580 - (self.spacing.groupLeft * 2)
+    group:SetWidth(width)
+    
+    group:SetPoint("TOPLEFT", parentGroup, "TOPLEFT", self.spacing.groupLeft, parentGroup.currentY)
+    
+    group.elements = {}
+    group.currentY = -self.spacing.groupTop
+    return group
+end
+
+function SettingsBuilder:EndSubGroup(group, parentGroup)
+    local totalHeight = math.abs(group.currentY) + self.spacing.groupBottom
+    group:SetHeight(totalHeight)
+    
+    group:SetBackdrop({
+        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    group:SetBackdropColor(0.15, 0.15, 0.15, 0.5)
+    group:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
+    
+    parentGroup.currentY = parentGroup.currentY - (totalHeight + self.spacing.item)
+    table.insert(parentGroup.elements, group)
+    return group
+end
+
+-- Profile Management
+local currentProfile = "Main Display"
+local profiles = {
+    { name = "Main Display", prefix = "" },
+    { name = "Nameplate Display", prefix = "nameplate" }
+}
+
+local globalKeys = {
+    ["enabled"] = true,
+    ["onlyWithEnemyTarget"] = true,
+    ["attachToNameplate"] = true
+}
+
+local function GetSettingKey(baseKey)
+    if globalKeys[baseKey] then return baseKey end
+
+    local profile = nil
+    for _, p in ipairs(profiles) do
+        if p.name == currentProfile then profile = p break end
+    end
+    
+    if not profile then return baseKey end
+    
+    if profile.prefix == "" then
+        -- Lowercase first letter for main profile (e.g. "IconSize" -> "iconSize")
+        return baseKey:gsub("^%u", string.lower)
+    else
+        -- Prefix + Uppercase first letter (e.g. "IconSize" -> "nameplateIconSize")
+        return profile.prefix .. baseKey:gsub("^%l", string.upper)
+    end
+end
+
+local function GetSetting(baseKey)
+    local key = GetSettingKey(baseKey)
+    return KnackDB.settings[key]
+end
+
+local function SetSetting(baseKey, value)
+    local key = GetSettingKey(baseKey)
+    KnackDB.settings[key] = value
+end
+
+local function UpdatePanelValues(builder)
+    for _, control in ipairs(builder.controls) do
+        local key = GetSettingKey(control.settingKey)
+        local value = KnackDB.settings[key]
+        
+        if control:GetObjectType() == "CheckButton" then
+            control:SetChecked(value)
+            
+        elseif control:GetObjectType() == "Slider" then
+            control:SetValue(value or 0)
+            _G[control.name .. "Text"]:SetText(control.labelFormat(value or 0))
+            
+        elseif control:GetObjectType() == "Button" and control.swatch then -- ColorPicker
+            local r, g, b, a = unpack(value or {1, 1, 1, 1})
+            control.swatch:SetColorTexture(r, g, b, a)
+            
+        elseif control:GetObjectType() == "Frame" and control.InitializeDropdown then -- Dropdown
+            UIDropDownMenu_SetText(control, value)
+            -- No need to re-initialize, the existing initialization function is dynamic now!
+        end
+    end
+    
+    -- Handle visibility of profile-specific controls
+    if builder.profileSpecificControls then
+        for profileName, controls in pairs(builder.profileSpecificControls) do
+            for _, control in ipairs(controls) do
+                if profileName == currentProfile then
+                    control:Show()
+                else
+                    control:Hide()
+                end
+            end
+        end
+    end
 end
 
 -- Create the settings panel
 local function CreateSettingsPanel()
     local builder = SettingsBuilder:New("knack", UIParent)
     builder:AddTitle("knack - Next Assisted Combat", "Configure the next assisted combat spell icon display")
+    builder.profileSpecificControls = { ["Main Display"] = {}, ["Nameplate Display"] = {} }
     
-    -- GROUP 1: Enable & Enemy Target
-    local enableGroup = builder:BeginGroup()
-    builder:AddCheckbox(enableGroup, "Enable knack", "Show/hide the assisted combat spell icon", "enabled", function(self)
+    -- GROUP 1: General Settings (Global)
+    local globalGroup = builder:BeginGroup()
+    builder:AddHeader(globalGroup, "General Settings")
+    builder:AddCheckbox(globalGroup, "Enable knack", "Show/hide the assisted combat spell icon", "enabled", function(self)
         KnackDB.settings.enabled = self:GetChecked()
         KnackUpdateVisibility()
     end)
-    builder:AddCheckbox(enableGroup, "Only show with enemy target", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
+    builder:AddCheckbox(globalGroup, "Only show with enemy target", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
         KnackDB.settings.onlyWithEnemyTarget = self:GetChecked()
     end)
-    builder:EndGroup(enableGroup)
+    
+    builder:AddCheckbox(globalGroup, "Attach copy to Nameplate", "Attach a copy of the icon to the current target's nameplate", "attachToNameplate", function(self)
+        KnackDB.settings.attachToNameplate = self:GetChecked()
+        if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
+    end)
+    builder:EndGroup(globalGroup)
 
-    -- GROUP 1.5: Nameplate Integration (Only if 'next' is loaded)
-    if C_AddOns.IsAddOnLoaded("next") then
-        local nameplateGroup = builder:BeginGroup()
-        builder:AddCheckbox(nameplateGroup, "Attach copy to Nameplate", "Attach a copy of the icon to the current target's nameplate", "attachToNameplate", function(self)
-            KnackDB.settings.attachToNameplate = self:GetChecked()
-            if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
-        end)
-
-        local anchorPoints = {"TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT"}
-        local dropdown = builder:AddDropdown(nameplateGroup, "Anchor Point:", anchorPoints, KnackDB.settings.nameplateAnchor or "TOP", function(val)
-            KnackDB.settings.nameplateAnchor = val
-            if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
-        end)
-
-        -- Add slider to the right of the dropdown
-        local rowY = nameplateGroup.currentY - CONSTANTS.PADDING_LARGE
-        builder:AddSlider(nameplateGroup, "KnackNameplateIconSizeSlider", 18, 64, KnackDB.settings.nameplateIconSize or 32, 
-            "18", "64",
-            function(v) return "Size: " .. v end,
-            function(v) 
-                KnackDB.settings.nameplateIconSize = v 
-                if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
-            end,
-            nil, 0, rowY)
-
-        builder:AddSlider(nameplateGroup, "KnackNameplateOffsetSlider", 0, 13, KnackDB.settings.nameplateOffset or 0, 
-            "0", "13",
-            function(v) return "Offset: " .. v end,
-            function(v) 
-                KnackDB.settings.nameplateOffset = v 
-                if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
-            end,
-            nil, 220, rowY)
-            
-        nameplateGroup.currentY = nameplateGroup.currentY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item) - CONSTANTS.PADDING_LARGE
-
-        -- Nameplate Border
-        builder:AddCheckbox(nameplateGroup, "Show Border", "Show a border around the nameplate icon", "nameplateShowBorder", function(self)
-            KnackDB.settings.nameplateShowBorder = self:GetChecked()
-            if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end
-        end)
-
-        local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
-        local borderList = {}
-        if LSM then
-            for _, borderName in pairs(LSM:List("border")) do
-                table.insert(borderList, borderName)
-            end
-            table.sort(borderList)
-        else
-            borderList = {"Blizzard Tooltip", "Blizzard Dialog"}
+    -- GROUP 2: Configuration Table (Main Container)
+    local configGroup = builder:BeginGroup()
+    builder:AddHeader(configGroup, "Configure Icon")
+    
+    -- Profile Selector (Top of the table)
+    local availableProfiles = {}
+    for _, p in ipairs(profiles) do
+        if not p.condition or p.condition() then
+            table.insert(availableProfiles, p.name)
         end
-
-        local npDropdown = builder:AddDropdown(nameplateGroup, "Border Texture:", borderList, KnackDB.settings.nameplateBorderTexture or "Blizzard Tooltip", function(val)
-            KnackDB.settings.nameplateBorderTexture = val
-            if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end
-        end)
-
-        builder:AddColorPicker(nameplateGroup, "Border Color", "nameplateBorderColor", function(r, g, b, a)
-            if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end
-        end, npDropdown)
-
-        local npRowY = nameplateGroup.currentY
-        builder:AddSlider(nameplateGroup, "KnackNameplateBorderWidthSlider", 1, 64, KnackDB.settings.nameplateBorderWidth or 16, 
-            "1", "64",
-            function(v) return "Border Thickness: " .. v end,
-            function(v) KnackDB.settings.nameplateBorderWidth = v; if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end end,
-            nil, 0, npRowY - CONSTANTS.PADDING_LARGE)
-            
-        builder:AddSlider(nameplateGroup, "KnackNameplateBorderOffsetSlider", -20, 20, KnackDB.settings.nameplateBorderOffset or 2, 
-            "-20", "20",
-            function(v) return "Border Offset: " .. v end,
-            function(v) KnackDB.settings.nameplateBorderOffset = v; if KnackUpdateNameplateBorder then KnackUpdateNameplateBorder() end end,
-            nil, 220, npRowY - CONSTANTS.PADDING_LARGE)
-            
-        nameplateGroup.currentY = npRowY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item)
-
-        -- Nameplate Hotkey
-        local fontList = {}
-        if LSM then
-            for _, fontName in pairs(LSM:List("font")) do
-                table.insert(fontList, fontName)
-            end
-            table.sort(fontList)
-        else
-            fontList = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
-        end
-        
-        builder:AddDropdown(nameplateGroup, "Hotkey Font:", fontList, KnackDB.settings.nameplateHotkeyFont or "Friz Quadrata TT", function(fontName)
-            KnackDB.settings.nameplateHotkeyFont = fontName
-            if KnackUpdateHotkeyFont then KnackUpdateHotkeyFont() end
-        end)
-        
-        builder:AddSlider(nameplateGroup, "KnackNameplateHotkeySizeSlider", CONSTANTS.SLIDER.HOTKEY_MIN, CONSTANTS.SLIDER.HOTKEY_MAX, KnackDB.settings.nameplateHotkeySize or 10, 
-            tostring(CONSTANTS.SLIDER.HOTKEY_MIN), tostring(CONSTANTS.SLIDER.HOTKEY_MAX),
-            function(v) return "Hotkey Font Size: " .. v end,
-            function(v) KnackDB.settings.nameplateHotkeySize = v; if KnackUpdateHotkeyFont then KnackUpdateHotkeyFont() end end)
-
-        -- Nameplate Tooltip
-        builder:AddCheckbox(nameplateGroup, "Show tooltip", "Display the spell tooltip when hovering over the nameplate icon", "nameplateShowTooltip", function(self)
-            KnackDB.settings.nameplateShowTooltip = self:GetChecked()
-        end)
-        
-        builder:AddCheckbox(nameplateGroup, "Hide tooltip in combat", "Only show tooltip when out of combat", "nameplateHideTooltipInCombat", function(self)
-            KnackDB.settings.nameplateHideTooltipInCombat = self:GetChecked()
-        end)
-
-        -- Nameplate GCD
-        builder:AddCheckbox(nameplateGroup, "Show GCD overlay", "Display a darkening overlay on the icon during global cooldown", "nameplateShowGCD", function(self)
-            KnackDB.settings.nameplateShowGCD = self:GetChecked()
-            if KnackUpdateGCDOverlay then KnackUpdateGCDOverlay() end
-        end)
-        
-        builder:AddSlider(nameplateGroup, "KnackNameplateGCDOpacitySlider", CONSTANTS.SLIDER.GCD_MIN, CONSTANTS.SLIDER.GCD_MAX, KnackDB.settings.nameplateGCDOpacity or 0.7, 
-            tostring(CONSTANTS.SLIDER.GCD_MIN) .. "%", tostring(CONSTANTS.SLIDER.GCD_MAX * 100) .. "%",
-            function(v) return "GCD Opacity: " .. math.floor(v * 100) .. "%" end,
-            function(v) KnackDB.settings.nameplateGCDOpacity = v; if KnackUpdateGCDOverlay then KnackUpdateGCDOverlay() end end,
-            CONSTANTS.SLIDER.GCD_STEP)
-
-        builder:EndGroup(nameplateGroup)
     end
     
-    -- GROUP 2: Icon Size, Reset Position & Instructions
-    local iconGroup = builder:BeginGroup()
-    builder:AddText(iconGroup, "Hold SHIFT and use the scrollwheel to resize the spell icon", CONSTANTS.GRAY_TEXT)
-    builder:AddSlider(iconGroup, "KnackIconSizeSlider", CONSTANTS.SLIDER.ICON_MIN, CONSTANTS.SLIDER.ICON_MAX, KnackDB.settings.iconSize, 
-        tostring(CONSTANTS.SLIDER.ICON_MIN), tostring(CONSTANTS.SLIDER.ICON_MAX),
-        function(v) return "Icon Size: " .. v end,
-        function(v)
-            KnackDB.settings.iconSize = v
-            KnackUpdateIconSize()
-        end)
-    builder:AddText(iconGroup, "Hold SHIFT and drag the spell icon to reposition it.", CONSTANTS.GRAY_TEXT)
-    builder:AddButton(iconGroup, "Reset Position", 150, function()
+    builder:AddDropdown(configGroup, "Profile:", availableProfiles, currentProfile, function(val)
+        currentProfile = val
+        UpdatePanelValues(builder)
+    end)
+    
+    -- Row 1: Size & Position
+    local sizeRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(sizeRow, "Size & Position")
+    
+    local startY = sizeRow.currentY
+    
+    -- Main Profile Controls
+    local mainResetBtn = builder:AddButton(sizeRow, "Reset Position", 150, function()
         KnackResetPosition()
         print("|cff00ff00[knack]|r position reset to center.")
     end)
-    builder:EndGroup(iconGroup)
+    table.insert(builder.profileSpecificControls["Main Display"], mainResetBtn)
     
-    -- GROUP 2.5: Border Settings
-    local borderGroup = builder:BeginGroup()
-    builder:AddCheckbox(borderGroup, "Show Border", "Show a border around the icon", "showBorder", function(self)
-        KnackDB.settings.showBorder = self:GetChecked()
-        KnackUpdateBorder()
+    local mainText1 = builder:AddText(sizeRow, "Hold SHIFT and use the scrollwheel to resize the spell icon", CONSTANTS.GRAY_TEXT)
+    table.insert(builder.profileSpecificControls["Main Display"], mainText1)
+    
+    local mainText2 = builder:AddText(sizeRow, "Hold SHIFT and drag the spell icon to reposition it.", CONSTANTS.GRAY_TEXT)
+    table.insert(builder.profileSpecificControls["Main Display"], mainText2)
+    
+    local mainY = sizeRow.currentY
+    
+    -- Nameplate Profile Controls
+    sizeRow.currentY = startY -- Reset Y for overlap
+    
+    local anchorPoints = {"TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT"}
+    local npAnchorDropdown = builder:AddDropdown(sizeRow, "Anchor Point:", anchorPoints, KnackDB.settings.nameplateAnchor or "TOP", function(val)
+        KnackDB.settings.nameplateAnchor = val
+        if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
     end)
+    table.insert(builder.profileSpecificControls["Nameplate Display"], npAnchorDropdown)
+    table.insert(builder.profileSpecificControls["Nameplate Display"], npAnchorDropdown.label)
+
+    local npOffsetSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetSlider", 0, 13, KnackDB.settings.nameplateOffset or 0, 
+        "0", "13",
+        function(v) return "Offset: " .. v end,
+        function(v) 
+            KnackDB.settings.nameplateOffset = v 
+            if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
+        end,
+        nil, 0, nil)
+    table.insert(builder.profileSpecificControls["Nameplate Display"], npOffsetSlider)
+    
+    local npY = sizeRow.currentY
+    
+    -- Set Y to the lowest point of both branches
+    sizeRow.currentY = math.min(mainY, npY)
+
+    -- Generic Size Slider
+    builder:AddSlider(sizeRow, "KnackGenericIconSizeSlider", CONSTANTS.SLIDER.ICON_MIN, CONSTANTS.SLIDER.ICON_MAX, 64, 
+        tostring(CONSTANTS.SLIDER.ICON_MIN), tostring(CONSTANTS.SLIDER.ICON_MAX),
+        function(v) return "Icon Size: " .. v end,
+        function(v)
+            SetSetting("IconSize", v)
+            if currentProfile == "Main Display" then KnackUpdateIconSize() 
+            else KnackUpdateNameplateAttachment() end
+        end, nil, 0, nil, "IconSize")
+        
+    builder:EndSubGroup(sizeRow, configGroup)
+        
+    -- Row 2: Border Settings
+    local borderRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(borderRow, "Border Settings")
+    
+    builder:AddCheckbox(borderRow, "Show Border", "Show a border around the icon", "ShowBorder", function(self)
+        SetSetting("ShowBorder", self:GetChecked())
+        if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+    end, 0)
     
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     local borderList = {}
@@ -494,37 +650,103 @@ local function CreateSettingsPanel()
         borderList = {"Blizzard Tooltip", "Blizzard Dialog"}
     end
     
-    local dropdown = builder:AddDropdown(borderGroup, "Border Texture:", borderList, KnackDB.settings.borderTexture or "Blizzard Tooltip", function(val)
-        KnackDB.settings.borderTexture = val
-        KnackUpdateBorder()
+    local borderDropdown = builder:AddDropdown(borderRow, "Border Texture:", borderList, "Blizzard Tooltip", function(val)
+        SetSetting("BorderTexture", val)
+        if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+    end, "BorderTexture")
+    
+    -- Color Picker
+    local cpButton = CreateFrame("Button", nil, builder.container)
+    cpButton:SetSize(20, 20)
+    cpButton:SetPoint("LEFT", borderDropdown, "RIGHT", 10, 2)
+    
+    cpButton.swatch = cpButton:CreateTexture(nil, "OVERLAY")
+    cpButton.swatch:SetAllPoints(cpButton)
+    cpButton.swatch:SetColorTexture(1, 1, 1, 1)
+    
+    cpButton.border = cpButton:CreateTexture(nil, "BACKGROUND")
+    cpButton.border:SetPoint("TOPLEFT", cpButton, "TOPLEFT", -1, 1)
+    cpButton.border:SetPoint("BOTTOMRIGHT", cpButton, "BOTTOMRIGHT", 1, -1)
+    cpButton.border:SetColorTexture(0.5, 0.5, 0.5)
+    
+    cpButton:SetScript("OnClick", function()
+        local settingKey = GetSettingKey("BorderColor")
+        local r, g, b, a = unpack(KnackDB.settings[settingKey] or {1, 1, 1, 1})
+        
+        local function OnColorSelect()
+            local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+            local newA = a
+            if ColorPickerFrame.GetColorAlpha then
+                newA = ColorPickerFrame:GetColorAlpha()
+            elseif OpacitySliderFrame then
+                newA = OpacitySliderFrame:GetValue()
+            end
+            
+            KnackDB.settings[settingKey] = {newR, newG, newB, newA}
+            cpButton.swatch:SetColorTexture(newR, newG, newB, newA)
+            if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+        end
+        
+        local function OnCancel()
+            KnackDB.settings[settingKey] = {r, g, b, a}
+            cpButton.swatch:SetColorTexture(r, g, b, a)
+            if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+        end
+        
+        if ColorPickerFrame.SetupColorPickerAndShow then
+            local info = {
+                swatchFunc = OnColorSelect,
+                opacityFunc = OnColorSelect,
+                cancelFunc = OnCancel,
+                hasOpacity = true,
+                opacity = a,
+                r = r,
+                g = g,
+                b = b,
+            }
+            ColorPickerFrame:SetupColorPickerAndShow(info)
+        else
+            ColorPickerFrame.func = OnColorSelect
+            ColorPickerFrame.opacityFunc = OnColorSelect
+            ColorPickerFrame.cancelFunc = OnCancel
+            ColorPickerFrame:SetColorRGB(r, g, b)
+            ColorPickerFrame.hasOpacity = true
+            ColorPickerFrame.opacity = a
+            ColorPickerFrame:Show()
+        end
     end)
     
-    builder:AddColorPicker(borderGroup, "Border Color", "borderColor", function(r, g, b, a)
-        KnackUpdateBorder()
-    end, dropdown)
+    cpButton.settingKey = "BorderColor"
+    table.insert(builder.controls, cpButton)
+    table.insert(borderRow.elements, cpButton)
     
-    local rowY = borderGroup.currentY
+    local rowY = borderRow.currentY
     
-    builder:AddSlider(borderGroup, "KnackBorderWidthSlider", 1, 64, KnackDB.settings.borderWidth or 16, 
+    builder:AddSlider(borderRow, "KnackGenericBorderWidthSlider", 1, 64, 16, 
         "1", "64",
         function(v) return "Border Thickness: " .. v end,
-        function(v) KnackDB.settings.borderWidth = v KnackUpdateBorder() end,
-        nil, 0, rowY - CONSTANTS.PADDING_LARGE)
+        function(v) 
+            SetSetting("BorderWidth", v) 
+            if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+        end,
+        nil, 0, rowY - CONSTANTS.PADDING_LARGE, "BorderWidth")
         
-    builder:AddSlider(borderGroup, "KnackBorderOffsetSlider", -20, 20, KnackDB.settings.borderOffset or 2, 
+    builder:AddSlider(borderRow, "KnackGenericBorderOffsetSlider", -20, 20, 2, 
         "-20", "20",
         function(v) return "Border Offset: " .. v end,
-        function(v) KnackDB.settings.borderOffset = v KnackUpdateBorder() end,
-        nil, 220, rowY - CONSTANTS.PADDING_LARGE)
+        function(v) 
+            SetSetting("BorderOffset", v) 
+            if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+        end,
+        nil, 220, rowY - CONSTANTS.PADDING_LARGE, "BorderOffset")
         
-    borderGroup.currentY = rowY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item)
-        
-    builder:EndGroup(borderGroup)
+    borderRow.currentY = rowY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item)
+    builder:EndSubGroup(borderRow, configGroup)
     
-    -- GROUP 3: Hotkey Font & Size
-    local hotkeyGroup = builder:BeginGroup()
+    -- Row 3: Hotkey Settings
+    local hotkeyRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(hotkeyRow, "Hotkey Settings")
     
-    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     local fontList = {}
     if LSM then
         for _, fontName in pairs(LSM:List("font")) do
@@ -535,49 +757,70 @@ local function CreateSettingsPanel()
         fontList = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
     end
     
-    builder:AddDropdown(hotkeyGroup, "Hotkey Font:", fontList, KnackDB.settings.hotkeyFont or "Friz Quadrata TT", function(fontName)
-        KnackDB.settings.hotkeyFont = fontName
-        if KnackUpdateHotkeyFont then KnackUpdateHotkeyFont() end
-    end)
+    builder:AddDropdown(hotkeyRow, "Hotkey Font:", fontList, "Friz Quadrata TT", function(fontName)
+        SetSetting("HotkeyFont", fontName)
+        KnackUpdateHotkeyFont()
+    end, "HotkeyFont")
     
-    builder:AddSlider(hotkeyGroup, "KnackHotkeySizeSlider", CONSTANTS.SLIDER.HOTKEY_MIN, CONSTANTS.SLIDER.HOTKEY_MAX, KnackDB.settings.hotkeySize, 
+    builder:AddSlider(hotkeyRow, "KnackGenericHotkeySizeSlider", CONSTANTS.SLIDER.HOTKEY_MIN, CONSTANTS.SLIDER.HOTKEY_MAX, 10, 
         tostring(CONSTANTS.SLIDER.HOTKEY_MIN), tostring(CONSTANTS.SLIDER.HOTKEY_MAX),
         function(v) return "Hotkey Font Size: " .. v end,
-        function(v) KnackDB.settings.hotkeySize = v KnackUpdateHotkeySize() end)
-    builder:EndGroup(hotkeyGroup)
+        function(v) SetSetting("HotkeySize", v) KnackUpdateHotkeySize() end, nil, nil, nil, "HotkeySize")
+    builder:EndSubGroup(hotkeyRow, configGroup)
     
-    -- GROUP 4: Tooltip Settings
-    local tooltipGroup = builder:BeginGroup()
-    local tooltipCheck = builder:AddCheckbox(tooltipGroup, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "showTooltip", function(self)
-        KnackDB.settings.showTooltip = self:GetChecked()
-        local hideCheck = _G["KnackHideTooltipInCombatCheck"]
-        if hideCheck then 
-            hideCheck:SetEnabled(self:GetChecked())
-            hideCheck:SetAlpha(self:GetChecked() and CONSTANTS.ALPHA.ENABLED or CONSTANTS.ALPHA.DISABLED)
-        end
-    end)
+    -- Row 4: Tooltip Settings
+    local tooltipRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(tooltipRow, "Tooltip Settings")
     
-    local hideCheck = builder:AddCheckbox(tooltipGroup, "Hide tooltip in combat", "Only show tooltip when out of combat", "hideTooltipInCombat", function(self)
-        KnackDB.settings.hideTooltipInCombat = self:GetChecked()
+    builder:AddCheckbox(tooltipRow, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "ShowTooltip", function(self)
+        SetSetting("ShowTooltip", self:GetChecked())
+        UpdatePanelValues(builder)
+    end, 0)
+    
+    builder:AddCheckbox(tooltipRow, "Hide tooltip in combat", "Only show tooltip when out of combat", "HideTooltipInCombat", function(self)
+        SetSetting("HideTooltipInCombat", self:GetChecked())
     end, 20)
+    builder:EndSubGroup(tooltipRow, configGroup)
     
-    hideCheck:SetEnabled(KnackDB.settings.showTooltip)
-    hideCheck:SetAlpha(KnackDB.settings.showTooltip and CONSTANTS.ALPHA.ENABLED or CONSTANTS.ALPHA.DISABLED)
-    builder:EndGroup(tooltipGroup)
+    -- Row 5: Timers & Overlays
+    local timersRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(timersRow, "Timers & Overlays")
     
-    -- GROUP 5: GCD Overlay & Opacity
-    local gcdGroup = builder:BeginGroup()
-    builder:AddCheckbox(gcdGroup, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "showGCD", function(self)
-        KnackDB.settings.showGCD = self:GetChecked()
+    builder:AddCheckbox(timersRow, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "ShowGCD", function(self)
+        SetSetting("ShowGCD", self:GetChecked())
         KnackUpdateGCDOverlay()
-    end)
+    end, 0)
     
-    builder:AddSlider(gcdGroup, "KnackGCDOpacitySlider", CONSTANTS.SLIDER.GCD_MIN, CONSTANTS.SLIDER.GCD_MAX, KnackDB.settings.gcdOpacity, 
+    builder:AddSlider(timersRow, "KnackGenericGCDOpacitySlider", CONSTANTS.SLIDER.GCD_MIN, CONSTANTS.SLIDER.GCD_MAX, 0.7, 
         tostring(CONSTANTS.SLIDER.GCD_MIN) .. "%", tostring(CONSTANTS.SLIDER.GCD_MAX * 100) .. "%",
         function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
-        function(v) KnackDB.settings.gcdOpacity = v KnackUpdateGCDOverlay() end,
-        CONSTANTS.SLIDER.GCD_STEP)
-    builder:EndGroup(gcdGroup)
+        function(v) SetSetting("GCDOpacity", v) KnackUpdateGCDOverlay() end,
+        CONSTANTS.SLIDER.GCD_STEP, nil, nil, "GCDOpacity")
+
+    builder:AddCheckbox(timersRow, "Show Cast Timer sweep", "Display a sweep animation on the icon during spell casting", "ShowCastSweep", function(self)
+        SetSetting("ShowCastSweep", self:GetChecked())
+        UpdatePanelValues(builder)
+    end, 0)
+
+    builder:AddCheckbox(timersRow, "Show Cast Glow", "Display the inner glow effect during cast sweep", "ShowCastGlow", function(self)
+        SetSetting("ShowCastGlow", self:GetChecked())
+    end, 20)
+    
+    builder:AddCheckbox(timersRow, "Show Channel Timer sweep", "Display a sweep animation on the icon during spell channeling", "ShowChannelSweep", function(self)
+        SetSetting("ShowChannelSweep", self:GetChecked())
+        UpdatePanelValues(builder)
+    end, 0)
+
+    builder:AddCheckbox(timersRow, "Show Channel Glow", "Display the inner glow effect during channel sweep", "ShowChannelGlow", function(self)
+        SetSetting("ShowChannelGlow", self:GetChecked())
+    end, 20)
+
+    builder:EndSubGroup(timersRow, configGroup)
+    
+    builder:EndGroup(configGroup)
+    
+    -- Initial Update
+    UpdatePanelValues(builder)
     
     return builder.panel
 end

@@ -21,6 +21,12 @@ local CONSTANTS = {
         SPELL_ID = 61304,
         SWIPE_COLOR = {r = 0, g = 0, b = 0, a = 1}
     },
+    CAST = {
+        SWIPE_COLOR = {r = 0, g = 1, b = 0, a = 0.5}
+    },
+    CHANNEL = {
+        SWIPE_COLOR = {r = 0, g = 1, b = 0, a = 0.5}
+    },
     SCAN_INTERVAL = 0.1,
     MOVE_CURSOR = "Interface\\CURSOR\\UI-Cursor-Move",
     ACTION_BAR = {
@@ -143,6 +149,75 @@ function KnackDisplay:CreateElements()
     end
     self.gcdOverlay:Hide()
 
+    -- Helper to create sweep frames (StatusBar)
+    local function CreateSweepFrame(parent, anchor, color, atlas, glowAtlas)
+        local f = CreateFrame("StatusBar", nil, parent)
+        f:SetAllPoints(anchor)
+        
+        if atlas then
+            f:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+            f:GetStatusBarTexture():SetAtlas(atlas)
+            f:SetStatusBarColor(1, 1, 1, 1)
+        else
+            f:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+            f:SetStatusBarColor(color.r, color.g, color.b, color.a)
+        end
+        
+        f:SetMinMaxValues(0, 1)
+        f:SetValue(0)
+        f:Hide()
+        
+        -- Add Spark
+        local spark = f:CreateTexture(nil, "OVERLAY")
+        spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
+        spark:SetBlendMode("ADD")
+        spark:SetWidth(20)
+        spark:SetHeight(anchor:GetHeight() * 2)
+        spark:SetPoint("CENTER", f:GetStatusBarTexture(), "RIGHT", 0, 0)
+        spark:Show()
+        f.spark = spark
+        
+        -- Add Inner Glow
+        if glowAtlas then
+            local glow = f:CreateTexture(nil, "ARTWORK")
+            glow:SetAllPoints(anchor)
+            glow:SetAtlas(glowAtlas)
+            glow:SetBlendMode("ADD")
+            glow:Show()
+            f.glow = glow
+        end
+        
+        f:SetScript("OnUpdate", function(self, elapsed)
+            local now = GetTime()
+            if now > self.endTime then
+                self:Hide()
+                return
+            end
+            
+            local progress = (now - self.startTime) / self.duration
+            if self.reverse then
+                -- Channel: Right to Left (ReverseFill)
+                self:SetValue(progress)
+                self.spark:ClearAllPoints()
+                self.spark:SetPoint("CENTER", self:GetStatusBarTexture(), "LEFT", 0, 0)
+            else
+                -- Cast: Left to Right
+                self:SetValue(progress)
+                self.spark:ClearAllPoints()
+                self.spark:SetPoint("CENTER", self:GetStatusBarTexture(), "RIGHT", 0, 0)
+            end
+        end)
+        return f
+    end
+
+    -- Cast Overlay
+    self.castOverlay = CreateSweepFrame(self.frame, self.icon, CONSTANTS.CAST.SWIPE_COLOR, "UI-HUD-ActionBar-Cast-Fill", "UI-HUD-ActionBar-Casting-InnerGlow")
+    self.castOverlay:SetReverseFill(false)
+
+    -- Channel Overlay
+    self.channelOverlay = CreateSweepFrame(self.frame, self.icon, CONSTANTS.CHANNEL.SWIPE_COLOR, "UI-HUD-ActionBar-Channel-Fill", "UI-HUD-ActionBar-Channel-InnerGlow")
+    self.channelOverlay:SetReverseFill(true)
+
     -- Border
     self.border = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
     self.border:SetFrameLevel(self.frame:GetFrameLevel() + 1)
@@ -168,6 +243,14 @@ function KnackDisplay:CreateElements()
         self.nameplateFrame.gcdOverlay:SetSwipeColor(c.r, c.g, c.b, c.a)
     end
     self.nameplateFrame.gcdOverlay:Hide()
+
+    -- Nameplate Cast Overlay
+    self.nameplateFrame.castOverlay = CreateSweepFrame(self.nameplateFrame, self.nameplateFrame.icon, CONSTANTS.CAST.SWIPE_COLOR, "UI-HUD-ActionBar-Cast-Fill", "UI-HUD-ActionBar-Casting-InnerGlow")
+    self.nameplateFrame.castOverlay:SetReverseFill(false)
+
+    -- Nameplate Channel Overlay
+    self.nameplateFrame.channelOverlay = CreateSweepFrame(self.nameplateFrame, self.nameplateFrame.icon, CONSTANTS.CHANNEL.SWIPE_COLOR, "UI-HUD-ActionBar-Channel-Fill", "UI-HUD-ActionBar-Channel-InnerGlow")
+    self.nameplateFrame.channelOverlay:SetReverseFill(true)
 
     -- Nameplate Hotkey Text
     self.nameplateFrame.hotkeyText = self.nameplateFrame:CreateFontString(nil, "OVERLAY")
@@ -340,6 +423,94 @@ function KnackDisplay:UpdateGCD()
     end
 end
 
+function KnackDisplay:UpdateCast(startTime, duration)
+    local showSweep = KnackDB.settings.showCastSweep
+    local showGlow = KnackDB.settings.showCastGlow
+    
+    if not showSweep then
+        self.castOverlay:Hide()
+    else
+        if startTime and duration and duration > 0 then
+            self.castOverlay.startTime = startTime
+            self.castOverlay.duration = duration
+            self.castOverlay.endTime = startTime + duration
+            self.castOverlay.reverse = false
+            self.castOverlay:Show()
+            if self.castOverlay.glow then
+                if showGlow then self.castOverlay.glow:Show() else self.castOverlay.glow:Hide() end
+            end
+        else
+            self.castOverlay:Hide()
+        end
+    end
+
+    if self.nameplateFrame and self.nameplateFrame.castOverlay then
+        local npShowSweep = KnackDB.settings.nameplateShowCastSweep
+        local npShowGlow = KnackDB.settings.nameplateShowCastGlow
+        
+        if not npShowSweep then
+            self.nameplateFrame.castOverlay:Hide()
+        else
+            if startTime and duration and duration > 0 then
+                self.nameplateFrame.castOverlay.startTime = startTime
+                self.nameplateFrame.castOverlay.duration = duration
+                self.nameplateFrame.castOverlay.endTime = startTime + duration
+                self.nameplateFrame.castOverlay.reverse = false
+                self.nameplateFrame.castOverlay:Show()
+                if self.nameplateFrame.castOverlay.glow then
+                    if npShowGlow then self.nameplateFrame.castOverlay.glow:Show() else self.nameplateFrame.castOverlay.glow:Hide() end
+                end
+            else
+                self.nameplateFrame.castOverlay:Hide()
+            end
+        end
+    end
+end
+
+function KnackDisplay:UpdateChannel(startTime, duration)
+    local showSweep = KnackDB.settings.showChannelSweep
+    local showGlow = KnackDB.settings.showChannelGlow
+    
+    if not showSweep then
+        self.channelOverlay:Hide()
+    else
+        if startTime and duration and duration > 0 then
+            self.channelOverlay.startTime = startTime
+            self.channelOverlay.duration = duration
+            self.channelOverlay.endTime = startTime + duration
+            self.channelOverlay.reverse = true
+            self.channelOverlay:Show()
+            if self.channelOverlay.glow then
+                if showGlow then self.channelOverlay.glow:Show() else self.channelOverlay.glow:Hide() end
+            end
+        else
+            self.channelOverlay:Hide()
+        end
+    end
+
+    if self.nameplateFrame and self.nameplateFrame.channelOverlay then
+        local npShowSweep = KnackDB.settings.nameplateShowChannelSweep
+        local npShowGlow = KnackDB.settings.nameplateShowChannelGlow
+        
+        if not npShowSweep then
+            self.nameplateFrame.channelOverlay:Hide()
+        else
+            if startTime and duration and duration > 0 then
+                self.nameplateFrame.channelOverlay.startTime = startTime
+                self.nameplateFrame.channelOverlay.duration = duration
+                self.nameplateFrame.channelOverlay.endTime = startTime + duration
+                self.nameplateFrame.channelOverlay.reverse = true
+                self.nameplateFrame.channelOverlay:Show()
+                if self.nameplateFrame.channelOverlay.glow then
+                    if npShowGlow then self.nameplateFrame.channelOverlay.glow:Show() else self.nameplateFrame.channelOverlay.glow:Hide() end
+                end
+            else
+                self.nameplateFrame.channelOverlay:Hide()
+            end
+        end
+    end
+end
+
 function KnackDisplay:UpdateNameplateAttachment()
     if not KnackDB.settings.attachToNameplate then
         self.nameplateFrame:Hide()
@@ -487,6 +658,18 @@ function Knack:SetupEvents()
     eventFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
     eventFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
     
+    -- Cast Events
+    eventFrame:RegisterEvent("UNIT_SPELLCAST_START")
+    eventFrame:RegisterEvent("UNIT_SPELLCAST_DELAYED")
+    eventFrame:RegisterEvent("UNIT_SPELLCAST_STOP")
+    eventFrame:RegisterEvent("UNIT_SPELLCAST_FAILED")
+    eventFrame:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+    
+    -- Channel Events
+    eventFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+    eventFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_UPDATE")
+    eventFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
+    
     eventFrame:SetScript("OnEvent", function(_, event, arg1)
         if event == "ADDON_LOADED" and arg1 == addonName then
             self:OnLoad()
@@ -499,6 +682,34 @@ function Knack:SetupEvents()
             self.display:UpdateGCD()
         elseif event == "NAME_PLATE_UNIT_ADDED" or event == "NAME_PLATE_UNIT_REMOVED" then
             self.display:UpdateNameplateAttachment()
+        
+        -- Cast Handling
+        elseif event == "UNIT_SPELLCAST_START" and arg1 == "player" then
+            local _, _, _, startTime, endTime = UnitCastingInfo("player")
+            if startTime and endTime then
+                self.display:UpdateCast(startTime / 1000, (endTime - startTime) / 1000)
+            end
+        elseif event == "UNIT_SPELLCAST_DELAYED" and arg1 == "player" then
+            local _, _, _, startTime, endTime = UnitCastingInfo("player")
+            if startTime and endTime then
+                self.display:UpdateCast(startTime / 1000, (endTime - startTime) / 1000)
+            end
+        elseif (event == "UNIT_SPELLCAST_STOP" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED") and arg1 == "player" then
+            self.display:UpdateCast(nil, nil)
+            
+        -- Channel Handling
+        elseif event == "UNIT_SPELLCAST_CHANNEL_START" and arg1 == "player" then
+            local _, _, _, startTime, endTime = UnitChannelInfo("player")
+            if startTime and endTime then
+                self.display:UpdateChannel(startTime / 1000, (endTime - startTime) / 1000)
+            end
+        elseif event == "UNIT_SPELLCAST_CHANNEL_UPDATE" and arg1 == "player" then
+            local _, _, _, startTime, endTime = UnitChannelInfo("player")
+            if startTime and endTime then
+                self.display:UpdateChannel(startTime / 1000, (endTime - startTime) / 1000)
+            end
+        elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" and arg1 == "player" then
+            self.display:UpdateChannel(nil, nil)
         end
     end)
 end
