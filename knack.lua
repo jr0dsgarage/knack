@@ -56,9 +56,19 @@ function BindingUtils.GetBindingNameForSlot(slot)
         end
     end
     
-    -- Only map slots 1-12 to ACTIONBUTTON bindings to avoid duplicates from stance/bonus bars
-    if slot <= CONSTANTS.ACTION_BAR.BUTTONS_PER_BAR then
-        return "ACTIONBUTTON" .. button -- Bar 1 (slots 1-12)
+    -- Check if the slot is on the current main action bar page
+    local currentPage = GetActionBarPage and GetActionBarPage() or 1
+    local offset = GetBonusBarOffset and GetBonusBarOffset() or 0
+
+    if offset > 0 then
+        currentPage = 6 + offset
+    end
+
+    local startSlot = (currentPage - 1) * CONSTANTS.ACTION_BAR.BUTTONS_PER_BAR + 1
+    local endSlot = startSlot + CONSTANTS.ACTION_BAR.BUTTONS_PER_BAR - 1
+
+    if slot >= startSlot and slot <= endSlot then
+        return "ACTIONBUTTON" .. button
     end
     
     return nil
