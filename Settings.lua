@@ -539,6 +539,9 @@ local function CreateSettingsPanel()
     builder:AddTitle("knack - Next Assisted Combat", "Configure the next assisted combat spell icon display")
     builder.profileSpecificControls = { ["Main Display"] = {}, ["Nameplate Display"] = {} }
     
+    -- Forward declaration for reflow function
+    local ReflowConfigGroup
+    
     -- GROUP 1: General Settings (Global)
     local globalGroup = builder:BeginGroup()
     builder:AddHeader(globalGroup, "General Settings")
@@ -558,6 +561,8 @@ local function CreateSettingsPanel()
 
     -- GROUP 2: Configuration Table (Main Container)
     local configGroup = builder:BeginGroup()
+    configGroup.rows = {} -- Store rows for dynamic resizing
+    
     builder:AddHeader(configGroup, "Configure Icon")
     
     -- Profile Selector (Top of the table)
@@ -571,6 +576,7 @@ local function CreateSettingsPanel()
     builder:AddDropdown(configGroup, "Profile:", availableProfiles, currentProfile, function(val)
         currentProfile = val
         UpdatePanelValues(builder)
+        if ReflowConfigGroup then ReflowConfigGroup() end
     end)
     
     -- Row 1: Size & Position
@@ -649,10 +655,17 @@ local function CreateSettingsPanel()
 
     local npY = sizeRow.currentY
     
-    -- Set Y to the lowest point of both branches
-    sizeRow.currentY = math.min(mainY, npY)
+    -- Store heights for dynamic resizing
+    sizeRow.profileHeights = {
+        ["Main Display"] = math.abs(mainY) + builder.spacing.groupBottom,
+        ["Nameplate Display"] = math.abs(npY) + builder.spacing.groupBottom
+    }
+    
+    -- Set initial height based on current profile
+    sizeRow.currentY = -(sizeRow.profileHeights[currentProfile] - builder.spacing.groupBottom)
         
     builder:EndSubGroup(sizeRow, configGroup)
+    table.insert(configGroup.rows, sizeRow)
         
     -- Row 2: Border Settings
     local borderRow = builder:BeginSubGroup(configGroup)
@@ -766,6 +779,7 @@ local function CreateSettingsPanel()
         
     borderRow.currentY = rowY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item)
     builder:EndSubGroup(borderRow, configGroup)
+    table.insert(configGroup.rows, borderRow)
     
     -- Row 3: Hotkey Settings
     local hotkeyRow = builder:BeginSubGroup(configGroup)
@@ -791,6 +805,7 @@ local function CreateSettingsPanel()
         function(v) return "Hotkey Font Size: " .. v end,
         function(v) SetSetting("HotkeySize", v) KnackUpdateHotkeySize() end, nil, nil, nil, "HotkeySize")
     builder:EndSubGroup(hotkeyRow, configGroup)
+    table.insert(configGroup.rows, hotkeyRow)
     
     -- Row 4: Tooltip Settings
     local tooltipRow = builder:BeginSubGroup(configGroup)
@@ -805,6 +820,7 @@ local function CreateSettingsPanel()
         SetSetting("HideTooltipInCombat", self:GetChecked())
     end, 20)
     builder:EndSubGroup(tooltipRow, configGroup)
+    table.insert(configGroup.rows, tooltipRow)
     
     -- Row 5: Timers & Overlays
     local timersRow = builder:BeginSubGroup(configGroup)
@@ -840,11 +856,32 @@ local function CreateSettingsPanel()
     end, 20)
 
     builder:EndSubGroup(timersRow, configGroup)
+    table.insert(configGroup.rows, timersRow)
     
     builder:EndGroup(configGroup)
     
+    -- Define Reflow function
+    ReflowConfigGroup = function()
+        local _, _, _, _, startY = sizeRow:GetPoint()
+        local currentY = startY
+        
+        for _, row in ipairs(configGroup.rows) do
+            if row == sizeRow then
+                local h = row.profileHeights[currentProfile] or row:GetHeight()
+                row:SetHeight(h)
+            end
+            
+            row:SetPoint("TOPLEFT", configGroup, "TOPLEFT", builder.spacing.groupLeft, currentY)
+            currentY = currentY - row:GetHeight() - builder.spacing.item
+        end
+        
+        local totalHeight = math.abs(currentY) + builder.spacing.groupBottom
+        configGroup:SetHeight(totalHeight)
+    end
+    
     -- Initial Update
     UpdatePanelValues(builder)
+    ReflowConfigGroup()
     
     return builder.panel
 end
