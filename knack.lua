@@ -9,7 +9,7 @@ local CONSTANTS = {
         COLOR_OUT_OF_RANGE = {r = 0.8, g = 0.1, b = 0.1, a = 1}
     },
     ICON = {
-        MIN_SIZE = 32,
+        MIN_SIZE = 10,
         MAX_SIZE = 128,
         PADDING = 4,
         STEP = 4,
@@ -539,6 +539,9 @@ function KnackDisplay:UpdateNameplateAttachment()
         
         local anchor = KnackDB.settings.nameplateAnchor or "TOP"
         local offset = (KnackDB.settings.nameplateOffset or 0) - 13
+        local offsetX = KnackDB.settings.nameplateOffsetX or 0
+        local offsetY = KnackDB.settings.nameplateOffsetY or 0
+        
         local p, rP, x, y = anchor, anchor, 0, 0
         
         if anchor == "TOP" then p = "BOTTOM"; rP = "TOP"; y = offset
@@ -551,7 +554,7 @@ function KnackDisplay:UpdateNameplateAttachment()
         elseif anchor == "BOTTOMRIGHT" then p = "TOPLEFT"; rP = "BOTTOMRIGHT"; x = offset; y = -offset
         end
         
-        self.nameplateFrame:SetPoint(p, nameplate, rP, x, y)
+        self.nameplateFrame:SetPoint(p, nameplate, rP, x + offsetX, y + offsetY)
         self.nameplateFrame:Show()
         
         local size = KnackDB.settings.nameplateIconSize or 32

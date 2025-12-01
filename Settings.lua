@@ -10,9 +10,9 @@ local CONSTANTS = {
     SLIDER = {
         WIDTH = 200,
         HEIGHT = 48,
-        ICON_MIN = 18,
+        ICON_MIN = 10,
         ICON_MAX = 64,
-        HOTKEY_MIN = 8,
+        HOTKEY_MIN = 4,
         HOTKEY_MAX = 32,
         GCD_MIN = 0,
         GCD_MAX = 1,
@@ -38,6 +38,8 @@ KnackDefaultSettings = {
     nameplateAnchor = "TOP",
     nameplateIconSize = 32,
     nameplateOffset = 0,
+    nameplateOffsetX = 0,
+    nameplateOffsetY = 0,
     nameplateShowBorder = false,
     nameplateBorderTexture = "Blizzard Tooltip",
     nameplateBorderWidth = 16,
@@ -605,13 +607,24 @@ local function CreateSettingsPanel()
 
     local npOffsetSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetSlider", 0, 13, KnackDB.settings.nameplateOffset or 0, 
         "0", "13",
-        function(v) return "Offset: " .. v end,
+        function(v) return "Anchor Distance: " .. v end,
         function(v) 
             KnackDB.settings.nameplateOffset = v 
             if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
         end,
         nil, 0, nil)
     table.insert(builder.profileSpecificControls["Nameplate Display"], npOffsetSlider)
+
+    -- X Offset Slider (Right Column, aligned with Anchor Distance)
+    local npOffsetXSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetXSlider", -12, 12, KnackDB.settings.nameplateOffsetX or 0, 
+        "-12", "12",
+        function(v) return "X Offset: " .. v end,
+        function(v) 
+            KnackDB.settings.nameplateOffsetX = v 
+            if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
+        end,
+        nil, 220, sizeRow.currentY + CONSTANTS.SLIDER.HEIGHT + builder.spacing.item) -- Align with previous slider
+    table.insert(builder.profileSpecificControls["Nameplate Display"], npOffsetXSlider)
     
     local npY = sizeRow.currentY
     
@@ -627,6 +640,17 @@ local function CreateSettingsPanel()
             if currentProfile == "Main Display" then KnackUpdateIconSize() 
             else KnackUpdateNameplateAttachment() end
         end, nil, 0, nil, "IconSize")
+
+    -- Y Offset Slider (Right Column, aligned with Icon Size)
+    local npOffsetYSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetYSlider", -12, 12, KnackDB.settings.nameplateOffsetY or 0, 
+        "-12", "12",
+        function(v) return "Y Offset: " .. v end,
+        function(v) 
+            KnackDB.settings.nameplateOffsetY = v 
+            if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
+        end,
+        nil, 220, sizeRow.currentY + CONSTANTS.SLIDER.HEIGHT + builder.spacing.item) -- Align with Icon Size slider
+    table.insert(builder.profileSpecificControls["Nameplate Display"], npOffsetYSlider)
         
     builder:EndSubGroup(sizeRow, configGroup)
         
