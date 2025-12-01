@@ -486,10 +486,24 @@ function KnackDisplay:UpdateNameplateAttachment()
         return
     end
 
+    -- Try to find the health bar to anchor to
+    local anchorFrame = nameplate
+    if nameplate.UnitFrame and nameplate.UnitFrame.healthBar then
+        anchorFrame = nameplate.UnitFrame.healthBar
+    elseif nameplate.UnitFrame and nameplate.UnitFrame.HealthBar then
+        anchorFrame = nameplate.UnitFrame.HealthBar
+    elseif nameplate.UnitFrame then
+        anchorFrame = nameplate.UnitFrame
+    end
+
     local anchor = KnackDB.settings.nameplateAnchor or "TOP"
     local offset = KnackDB.settings.nameplateOffset or 0
-    local xOfs = KnackDB.settings.nameplateOffsetX or 0
-    local yOfs = KnackDB.settings.nameplateOffsetY or 0
+    local xPercent = KnackDB.settings.nameplateOffsetX or 0
+    local yPercent = KnackDB.settings.nameplateOffsetY or 0
+    
+    local npSize = KnackDB.settings.nameplateIconSize or KnackDefaultSettings.nameplateIconSize
+    local xOfs = (xPercent / 100) * npSize
+    local yOfs = (yPercent / 100) * npSize
     
     -- Smart Anchor Logic: Flip the anchor point for the icon to align edges
     local iconAnchor = anchor
@@ -520,7 +534,7 @@ function KnackDisplay:UpdateNameplateAttachment()
     end
 
     self.nameplateFrame:ClearAllPoints()
-    self.nameplateFrame:SetPoint(iconAnchor, nameplate, anchor, xOfs, yOfs)
+    self.nameplateFrame:SetPoint(iconAnchor, anchorFrame, anchor, xOfs, yOfs)
     self.nameplateFrame:Show()
 end
 
@@ -641,7 +655,7 @@ function Knack:OnLoad()
     self.display:UpdateSize()
     self.display:UpdateFont()
     self.display:UpdateGCD()
-    print("|cff00ff00[knack]|r loaded. Hold SHIFT to move the icon.")
+    print("|cff00ff00[knack]|r loaded. Hold SHIFT to move and resize the icon.")
 end
 
 function Knack:StartScanning()

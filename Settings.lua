@@ -37,7 +37,7 @@ KnackDefaultSettings = {
     attachToNameplate = false,
     nameplateAnchor = "TOP",
     nameplateIconSize = 32,
-    nameplateOffset = 0,
+    nameplateOffset = 1,
     nameplateOffsetX = 0,
     nameplateOffsetY = 0,
     nameplateShowBorder = false,
@@ -615,7 +615,7 @@ local function CreateSettingsPanel()
     table.insert(builder.profileSpecificControls["Nameplate Display"], npAnchorDropdown)
     table.insert(builder.profileSpecificControls["Nameplate Display"], npAnchorDropdown.label)
 
-    local npOffsetSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetSlider", 0, 13, KnackDB.settings.nameplateOffset or 0, 
+    local npOffsetSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetSlider", 0, 13, KnackDB.settings.nameplateOffset or 1, 
         "0", "13",
         function(v) return "Anchor Distance: " .. v end,
         function(v) 
@@ -626,9 +626,9 @@ local function CreateSettingsPanel()
     table.insert(builder.profileSpecificControls["Nameplate Display"], npOffsetSlider)
 
     -- X Offset Slider
-    local npOffsetXSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetXSlider", -12, 12, KnackDB.settings.nameplateOffsetX or 0, 
-        "-12", "12",
-        function(v) return "X Offset: " .. v end,
+    local npOffsetXSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetXSlider", -50, 50, KnackDB.settings.nameplateOffsetX or 0, 
+        "-50%", "50%",
+        function(v) return "X Offset: " .. v .. "%" end,
         function(v) 
             KnackDB.settings.nameplateOffsetX = v 
             if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
@@ -637,9 +637,9 @@ local function CreateSettingsPanel()
     table.insert(builder.profileSpecificControls["Nameplate Display"], npOffsetXSlider)
     
     -- Y Offset Slider
-    local npOffsetYSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetYSlider", -12, 12, KnackDB.settings.nameplateOffsetY or 0, 
-        "-12", "12",
-        function(v) return "Y Offset: " .. v end,
+    local npOffsetYSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetYSlider", -50, 50, KnackDB.settings.nameplateOffsetY or 0, 
+        "-50%", "50%",
+        function(v) return "Y Offset: " .. v .. "%" end,
         function(v) 
             KnackDB.settings.nameplateOffsetY = v 
             if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
