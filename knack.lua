@@ -336,7 +336,6 @@ function KnackDisplay:UpdateSize()
     
     local npSize = KnackDB.settings.nameplateIconSize or KnackDefaultSettings.nameplateIconSize
     self.nameplateFrame:SetSize(npSize, npSize)
-    self.nameplateFrame.icon:SetSize(npSize - CONSTANTS.ICON.PADDING, npSize - CONSTANTS.ICON.PADDING)
     self:UpdateNameplateBorder()
 end
 
@@ -492,19 +491,36 @@ function KnackDisplay:UpdateNameplateAttachment()
     local xOfs = KnackDB.settings.nameplateOffsetX or 0
     local yOfs = KnackDB.settings.nameplateOffsetY or 0
     
+    -- Smart Anchor Logic: Flip the anchor point for the icon to align edges
+    local iconAnchor = anchor
+    
+    if iconAnchor:find("TOP") then
+        iconAnchor = iconAnchor:gsub("TOP", "BOTTOM")
+    elseif iconAnchor:find("BOTTOM") then
+        iconAnchor = iconAnchor:gsub("BOTTOM", "TOP")
+    end
+    
+    if iconAnchor:find("LEFT") then
+        iconAnchor = iconAnchor:gsub("LEFT", "RIGHT")
+    elseif iconAnchor:find("RIGHT") then
+        iconAnchor = iconAnchor:gsub("RIGHT", "LEFT")
+    end
+    
     -- Adjust Y offset based on anchor and "distance" (offset)
     if anchor:find("TOP") then
         yOfs = yOfs + offset
     elseif anchor:find("BOTTOM") then
         yOfs = yOfs - offset
-    elseif anchor:find("LEFT") then
+    end
+
+    if anchor:find("LEFT") then
         xOfs = xOfs - offset
     elseif anchor:find("RIGHT") then
         xOfs = xOfs + offset
     end
 
     self.nameplateFrame:ClearAllPoints()
-    self.nameplateFrame:SetPoint(anchor, nameplate, anchor, xOfs, yOfs)
+    self.nameplateFrame:SetPoint(iconAnchor, nameplate, anchor, xOfs, yOfs)
     self.nameplateFrame:Show()
 end
 
