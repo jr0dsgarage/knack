@@ -637,8 +637,8 @@ local function CreateSettingsPanel()
         function(v) return "Icon Size: " .. v end,
         function(v)
             SetSetting("IconSize", v)
-            if currentProfile == "Main Display" then KnackUpdateIconSize() 
-            else KnackUpdateNameplateAttachment() end
+            KnackUpdateIconSize()
+            if currentProfile ~= "Main Display" then KnackUpdateNameplateAttachment() end
         end, nil, 0, nil, "IconSize")
 
     -- Y Offset Slider (Right Column, aligned with Icon Size)

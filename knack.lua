@@ -136,140 +136,120 @@ function KnackDisplay:CreateFrame()
     self.bg:SetColorTexture(0, 0, 0, CONSTANTS.ICON.BG_OPACITY)
 end
 
-function KnackDisplay:CreateElements()
+function KnackDisplay:CreateSweepFrame(parent, anchor, color, atlas, glowAtlas)
+    local f = CreateFrame("StatusBar", nil, parent)
+    f:SetAllPoints(anchor)
+    
+    if atlas then
+        f:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+        f:GetStatusBarTexture():SetAtlas(atlas)
+        f:SetStatusBarColor(1, 1, 1, 1)
+    else
+        f:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+        f:SetStatusBarColor(color.r, color.g, color.b, color.a)
+    end
+    
+    f:SetMinMaxValues(0, 1)
+    f:SetValue(0)
+    f:Hide()
+    
+    -- Add Spark
+    local spark = f:CreateTexture(nil, "OVERLAY")
+    spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
+    spark:SetBlendMode("ADD")
+    spark:SetWidth(20)
+    spark:SetHeight(anchor:GetHeight() * 2)
+    spark:SetPoint("CENTER", f:GetStatusBarTexture(), "RIGHT", 0, 0)
+    spark:Show()
+    f.spark = spark
+    
+    -- Add Inner Glow
+    if glowAtlas then
+        local glow = f:CreateTexture(nil, "ARTWORK")
+        glow:SetAllPoints(anchor)
+        glow:SetAtlas(glowAtlas)
+        glow:SetBlendMode("ADD")
+        glow:Show()
+        f.glow = glow
+    end
+    
+    f:SetScript("OnUpdate", function(self, elapsed)
+        local now = GetTime()
+        if now > self.endTime then
+            self:Hide()
+            return
+        end
+        
+        local progress = (now - self.startTime) / self.duration
+        if self.reverse then
+            -- Channel: Right to Left (ReverseFill)
+            self:SetValue(progress)
+            self.spark:ClearAllPoints()
+            self.spark:SetPoint("CENTER", self:GetStatusBarTexture(), "LEFT", 0, 0)
+        else
+            -- Cast: Left to Right
+            self:SetValue(progress)
+            self.spark:ClearAllPoints()
+            self.spark:SetPoint("CENTER", self:GetStatusBarTexture(), "RIGHT", 0, 0)
+        end
+    end)
+    return f
+end
+
+function KnackDisplay:PopulateIconFrame(frame)
     -- Icon
-    self.icon = self.frame:CreateTexture(nil, "ARTWORK")
-    self.icon:SetPoint("CENTER")
-    self.icon:SetTexCoord(CONSTANTS.ICON.TEXTURE_INSET, CONSTANTS.ICON.TEXTURE_OUTER, CONSTANTS.ICON.TEXTURE_INSET, CONSTANTS.ICON.TEXTURE_OUTER)
+    frame.icon = frame:CreateTexture(nil, "ARTWORK")
+    if frame == self.frame then
+        self.icon = frame.icon
+        frame.icon:SetPoint("CENTER")
+    else
+        frame.icon:SetAllPoints(frame)
+    end
+    frame.icon:SetTexCoord(CONSTANTS.ICON.TEXTURE_INSET, CONSTANTS.ICON.TEXTURE_OUTER, CONSTANTS.ICON.TEXTURE_INSET, CONSTANTS.ICON.TEXTURE_OUTER)
     
     -- Hotkey Text
-    self.hotkeyText = self.frame:CreateFontString(nil, "OVERLAY")
-    self.hotkeyText:SetPoint("TOPRIGHT", self.icon, "TOPRIGHT", CONSTANTS.FONT.OFFSET, CONSTANTS.FONT.OFFSET)
+    frame.hotkeyText = frame:CreateFontString(nil, "OVERLAY")
+    if frame == self.frame then
+        self.hotkeyText = frame.hotkeyText
+    end
+    frame.hotkeyText:SetPoint("TOPRIGHT", frame.icon, "TOPRIGHT", CONSTANTS.FONT.OFFSET, CONSTANTS.FONT.OFFSET)
     
     -- GCD Overlay
-    self.gcdOverlay = CreateFrame("Cooldown", nil, self.frame, "CooldownFrameTemplate")
-    self.gcdOverlay:SetAllPoints(self.icon)
-    self.gcdOverlay:SetDrawEdge(false)
-    self.gcdOverlay:SetDrawSwipe(true)
-    self.gcdOverlay:SetReverse(false)
-    self.gcdOverlay:SetHideCountdownNumbers(true)
-    if self.gcdOverlay.SetSwipeColor then
+    frame.gcdOverlay = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
+    frame.gcdOverlay:SetAllPoints(frame.icon)
+    frame.gcdOverlay:SetDrawEdge(false)
+    frame.gcdOverlay:SetDrawSwipe(true)
+    frame.gcdOverlay:SetReverse(false)
+    frame.gcdOverlay:SetHideCountdownNumbers(true)
+    if frame.gcdOverlay.SetSwipeColor then
         local c = CONSTANTS.GCD.SWIPE_COLOR
-        self.gcdOverlay:SetSwipeColor(c.r, c.g, c.b, c.a)
+        frame.gcdOverlay:SetSwipeColor(c.r, c.g, c.b, c.a)
     end
-    self.gcdOverlay:Hide()
-
-    -- Helper to create sweep frames (StatusBar)
-    local function CreateSweepFrame(parent, anchor, color, atlas, glowAtlas)
-        local f = CreateFrame("StatusBar", nil, parent)
-        f:SetAllPoints(anchor)
-        
-        if atlas then
-            f:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-            f:GetStatusBarTexture():SetAtlas(atlas)
-            f:SetStatusBarColor(1, 1, 1, 1)
-        else
-            f:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-            f:SetStatusBarColor(color.r, color.g, color.b, color.a)
-        end
-        
-        f:SetMinMaxValues(0, 1)
-        f:SetValue(0)
-        f:Hide()
-        
-        -- Add Spark
-        local spark = f:CreateTexture(nil, "OVERLAY")
-        spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
-        spark:SetBlendMode("ADD")
-        spark:SetWidth(20)
-        spark:SetHeight(anchor:GetHeight() * 2)
-        spark:SetPoint("CENTER", f:GetStatusBarTexture(), "RIGHT", 0, 0)
-        spark:Show()
-        f.spark = spark
-        
-        -- Add Inner Glow
-        if glowAtlas then
-            local glow = f:CreateTexture(nil, "ARTWORK")
-            glow:SetAllPoints(anchor)
-            glow:SetAtlas(glowAtlas)
-            glow:SetBlendMode("ADD")
-            glow:Show()
-            f.glow = glow
-        end
-        
-        f:SetScript("OnUpdate", function(self, elapsed)
-            local now = GetTime()
-            if now > self.endTime then
-                self:Hide()
-                return
-            end
-            
-            local progress = (now - self.startTime) / self.duration
-            if self.reverse then
-                -- Channel: Right to Left (ReverseFill)
-                self:SetValue(progress)
-                self.spark:ClearAllPoints()
-                self.spark:SetPoint("CENTER", self:GetStatusBarTexture(), "LEFT", 0, 0)
-            else
-                -- Cast: Left to Right
-                self:SetValue(progress)
-                self.spark:ClearAllPoints()
-                self.spark:SetPoint("CENTER", self:GetStatusBarTexture(), "RIGHT", 0, 0)
-            end
-        end)
-        return f
-    end
+    frame.gcdOverlay:Hide()
 
     -- Cast Overlay
-    self.castOverlay = CreateSweepFrame(self.frame, self.icon, CONSTANTS.CAST.SWIPE_COLOR, "UI-HUD-ActionBar-Cast-Fill", "UI-HUD-ActionBar-Casting-InnerGlow")
-    self.castOverlay:SetReverseFill(false)
+    frame.castOverlay = self:CreateSweepFrame(frame, frame.icon, CONSTANTS.CAST.SWIPE_COLOR, "UI-HUD-ActionBar-Cast-Fill", "UI-HUD-ActionBar-Casting-InnerGlow")
+    frame.castOverlay:SetReverseFill(false)
 
     -- Channel Overlay
-    self.channelOverlay = CreateSweepFrame(self.frame, self.icon, CONSTANTS.CHANNEL.SWIPE_COLOR, "UI-HUD-ActionBar-Channel-Fill", "UI-HUD-ActionBar-Channel-InnerGlow")
-    self.channelOverlay:SetReverseFill(true)
+    frame.channelOverlay = self:CreateSweepFrame(frame, frame.icon, CONSTANTS.CHANNEL.SWIPE_COLOR, "UI-HUD-ActionBar-Channel-Fill", "UI-HUD-ActionBar-Channel-InnerGlow")
+    frame.channelOverlay:SetReverseFill(true)
 
     -- Border
-    self.border = CreateFrame("Frame", nil, self.frame, "BackdropTemplate")
-    self.border:SetFrameLevel(self.frame:GetFrameLevel() + 1)
-    self.border:Hide()
+    frame.border = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+    frame.border:SetFrameLevel(frame:GetFrameLevel() + 1)
+    frame.border:Hide()
+end
+
+function KnackDisplay:CreateElements()
+    self:PopulateIconFrame(self.frame)
 
     -- Nameplate Frame (Copy)
     self.nameplateFrame = CreateFrame("Frame", "KnackNameplateFrame", UIParent)
     self.nameplateFrame:SetSize(CONSTANTS.ICON.MIN_SIZE, CONSTANTS.ICON.MIN_SIZE)
     self.nameplateFrame:Hide()
     
-    self.nameplateFrame.icon = self.nameplateFrame:CreateTexture(nil, "ARTWORK")
-    self.nameplateFrame.icon:SetAllPoints(self.nameplateFrame)
-    self.nameplateFrame.icon:SetTexCoord(CONSTANTS.ICON.TEXTURE_INSET, CONSTANTS.ICON.TEXTURE_OUTER, CONSTANTS.ICON.TEXTURE_INSET, CONSTANTS.ICON.TEXTURE_OUTER)
-
-    self.nameplateFrame.gcdOverlay = CreateFrame("Cooldown", nil, self.nameplateFrame, "CooldownFrameTemplate")
-    self.nameplateFrame.gcdOverlay:SetAllPoints(self.nameplateFrame.icon)
-    self.nameplateFrame.gcdOverlay:SetDrawEdge(false)
-    self.nameplateFrame.gcdOverlay:SetDrawSwipe(true)
-    self.nameplateFrame.gcdOverlay:SetReverse(false)
-    self.nameplateFrame.gcdOverlay:SetHideCountdownNumbers(true)
-    if self.nameplateFrame.gcdOverlay.SetSwipeColor then
-        local c = CONSTANTS.GCD.SWIPE_COLOR
-        self.nameplateFrame.gcdOverlay:SetSwipeColor(c.r, c.g, c.b, c.a)
-    end
-    self.nameplateFrame.gcdOverlay:Hide()
-
-    -- Nameplate Cast Overlay
-    self.nameplateFrame.castOverlay = CreateSweepFrame(self.nameplateFrame, self.nameplateFrame.icon, CONSTANTS.CAST.SWIPE_COLOR, "UI-HUD-ActionBar-Cast-Fill", "UI-HUD-ActionBar-Casting-InnerGlow")
-    self.nameplateFrame.castOverlay:SetReverseFill(false)
-
-    -- Nameplate Channel Overlay
-    self.nameplateFrame.channelOverlay = CreateSweepFrame(self.nameplateFrame, self.nameplateFrame.icon, CONSTANTS.CHANNEL.SWIPE_COLOR, "UI-HUD-ActionBar-Channel-Fill", "UI-HUD-ActionBar-Channel-InnerGlow")
-    self.nameplateFrame.channelOverlay:SetReverseFill(true)
-
-    -- Nameplate Hotkey Text
-    self.nameplateFrame.hotkeyText = self.nameplateFrame:CreateFontString(nil, "OVERLAY")
-    self.nameplateFrame.hotkeyText:SetPoint("TOPRIGHT", self.nameplateFrame.icon, "TOPRIGHT", CONSTANTS.FONT.OFFSET, CONSTANTS.FONT.OFFSET)
-
-    -- Nameplate Border
-    self.nameplateFrame.border = CreateFrame("Frame", nil, self.nameplateFrame, "BackdropTemplate")
-    self.nameplateFrame.border:SetFrameLevel(self.nameplateFrame:GetFrameLevel() + 1)
-    self.nameplateFrame.border:Hide()
+    self:PopulateIconFrame(self.nameplateFrame)
 end
 
 function KnackDisplay:SetupScripts()
@@ -353,298 +333,212 @@ function KnackDisplay:UpdateSize()
     self.frame:SetSize(size, size)
     self.icon:SetSize(size - CONSTANTS.ICON.PADDING, size - CONSTANTS.ICON.PADDING)
     self:UpdateBorder()
+    
+    local npSize = KnackDB.settings.nameplateIconSize or KnackDefaultSettings.nameplateIconSize
+    self.nameplateFrame:SetSize(npSize, npSize)
+    self.nameplateFrame.icon:SetSize(npSize - CONSTANTS.ICON.PADDING, npSize - CONSTANTS.ICON.PADDING)
+    self:UpdateNameplateBorder()
 end
 
-function KnackDisplay:UpdateBorder()
-    if not KnackDB.settings.showBorder then
-        self.border:Hide()
+function KnackDisplay:UpdateFrameBorder(frame, prefix)
+    if not frame or not frame.border then return end
+
+    local key = (prefix == "" and "showBorder" or prefix .. "ShowBorder")
+    if not KnackDB.settings[key] then
+        frame.border:Hide()
         return
     end
 
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
-    local texture = (LSM and KnackDB.settings.borderTexture) and LSM:Fetch("border", KnackDB.settings.borderTexture) or "Interface\\Tooltips\\UI-Tooltip-Border"
+    local textureKey = (prefix == "" and "borderTexture" or prefix .. "BorderTexture")
+    local textureName = KnackDB.settings[textureKey]
+    local texture = (LSM and textureName) and LSM:Fetch("border", textureName) or "Interface\\Tooltips\\UI-Tooltip-Border"
     
-    local edgeSize = KnackDB.settings.borderWidth or KnackDefaultSettings.borderWidth
-    local offset = KnackDB.settings.borderOffset or KnackDefaultSettings.borderOffset
+    local widthKey = (prefix == "" and "borderWidth" or prefix .. "BorderWidth")
+    local edgeSize = KnackDB.settings[widthKey] or KnackDefaultSettings[widthKey]
     
-    self.border:SetBackdrop({
+    local offsetKey = (prefix == "" and "borderOffset" or prefix .. "BorderOffset")
+    local offset = KnackDB.settings[offsetKey] or KnackDefaultSettings[offsetKey]
+    
+    frame.border:SetBackdrop({
         edgeFile = texture,
         edgeSize = edgeSize,
         insets = { left = 0, right = 0, top = 0, bottom = 0 }
     })
     
-    self.border:ClearAllPoints()
-    self.border:SetPoint("TOPLEFT", self.frame, "TOPLEFT", -(offset + edgeSize), (offset + edgeSize))
-    self.border:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", (offset + edgeSize), -(offset + edgeSize))
+    frame.border:ClearAllPoints()
+    frame.border:SetPoint("TOPLEFT", frame, "TOPLEFT", -(offset + edgeSize), (offset + edgeSize))
+    frame.border:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", (offset + edgeSize), -(offset + edgeSize))
     
-    local color = KnackDB.settings.borderColor or KnackDefaultSettings.borderColor
-    self.border:SetBackdropBorderColor(color.r or color[1], color.g or color[2], color.b or color[3], color.a or color[4])
-    self.border:Show()
+    local colorKey = (prefix == "" and "borderColor" or prefix .. "BorderColor")
+    local color = KnackDB.settings[colorKey] or KnackDefaultSettings[colorKey]
+    frame.border:SetBackdropBorderColor(color.r or color[1], color.g or color[2], color.b or color[3], color.a or color[4])
+    frame.border:Show()
+end
+
+function KnackDisplay:UpdateBorder()
+    self:UpdateFrameBorder(self.frame, "")
+end
+
+function KnackDisplay:UpdateNameplateBorder()
+    self:UpdateFrameBorder(self.nameplateFrame, "nameplate")
+end
+
+function KnackDisplay:UpdateFrameFont(frame, prefix)
+    if not frame or not frame.hotkeyText then return end
+    
+    local fontKey = (prefix == "" and "hotkeyFont" or prefix .. "HotkeyFont")
+    local sizeKey = (prefix == "" and "hotkeySize" or prefix .. "HotkeySize")
+    
+    local fontPath = BindingUtils.GetFontPath(KnackDB.settings[fontKey])
+    local size = KnackDB.settings[sizeKey] or KnackDefaultSettings[sizeKey]
+    
+    frame.hotkeyText:SetFont(fontPath, size, "OUTLINE")
 end
 
 function KnackDisplay:UpdateFont()
-    local fontPath = BindingUtils.GetFontPath(KnackDB.settings.hotkeyFont)
-    local size = KnackDB.settings.hotkeySize or KnackDefaultSettings.hotkeySize
-    self.hotkeyText:SetFont(fontPath, size, "OUTLINE")
+    self:UpdateFrameFont(self.frame, "")
+    self:UpdateFrameFont(self.nameplateFrame, "nameplate")
+end
+
+function KnackDisplay:UpdateFrameGCD(frame, gcd, prefix)
+    if not frame or not frame.gcdOverlay then return end
     
-    if self.nameplateFrame and self.nameplateFrame.hotkeyText then
-        local npFontPath = BindingUtils.GetFontPath(KnackDB.settings.nameplateHotkeyFont)
-        local npSize = KnackDB.settings.nameplateHotkeySize or KnackDefaultSettings.nameplateHotkeySize
-        self.nameplateFrame.hotkeyText:SetFont(npFontPath, npSize, "OUTLINE")
+    local showKey = (prefix == "" and "showGCD" or prefix .. "ShowGCD")
+    if not KnackDB.settings[showKey] then
+        frame.gcdOverlay:Hide()
+        return
+    end
+    
+    if gcd then
+        frame.gcdOverlay:Show()
+        if frame.gcdOverlay.SetSwipeColor then
+            local opacityKey = (prefix == "" and "gcdOpacity" or prefix .. "GCDOpacity")
+            frame.gcdOverlay:SetSwipeColor(0, 0, 0, KnackDB.settings[opacityKey] or KnackDefaultSettings[opacityKey])
+        end
+        pcall(frame.gcdOverlay.SetCooldown, frame.gcdOverlay, gcd.startTime, gcd.duration)
+    else
+        frame.gcdOverlay:Hide()
     end
 end
 
 function KnackDisplay:UpdateGCD()
-    if not KnackDB.settings.showGCD then
-        self.gcdOverlay:Hide()
-        return
-    end
-
     local gcd = C_Spell.GetSpellCooldown(CONSTANTS.GCD.SPELL_ID)
-    
-    if gcd then
-        self.gcdOverlay:Show()
-        if self.gcdOverlay.SetSwipeColor then
-            self.gcdOverlay:SetSwipeColor(0, 0, 0, KnackDB.settings.gcdOpacity or KnackDefaultSettings.gcdOpacity)
-        end
-        
-        -- Blindly pass values to SetCooldown. 
-        -- We cannot check them or compare them if they are secrets.
-        -- We rely on SetCooldown to handle secret values and '0' duration.
-        pcall(self.gcdOverlay.SetCooldown, self.gcdOverlay, gcd.startTime, gcd.duration)
+    self:UpdateFrameGCD(self.frame, gcd, "")
+    self:UpdateFrameGCD(self.nameplateFrame, gcd, "nameplate")
+end
 
-        -- Update Nameplate GCD
-        if self.nameplateFrame and self.nameplateFrame.gcdOverlay then
-            if KnackDB.settings.nameplateShowGCD then
-                self.nameplateFrame.gcdOverlay:Show()
-                if self.nameplateFrame.gcdOverlay.SetSwipeColor then
-                    self.nameplateFrame.gcdOverlay:SetSwipeColor(0, 0, 0, KnackDB.settings.nameplateGCDOpacity or KnackDefaultSettings.nameplateGCDOpacity)
-                end
-                pcall(self.nameplateFrame.gcdOverlay.SetCooldown, self.nameplateFrame.gcdOverlay, gcd.startTime, gcd.duration)
-            else
-                self.nameplateFrame.gcdOverlay:Hide()
-            end
-        end
+function KnackDisplay:UpdateFrameSweep(frame, startTime, duration, isChannel, prefix)
+    local overlay = isChannel and frame.channelOverlay or frame.castOverlay
+    if not overlay then return end
+    
+    local typeStr = isChannel and "Channel" or "Cast"
+    local showKey = (prefix == "" and "show" .. typeStr .. "Sweep" or prefix .. "Show" .. typeStr .. "Sweep")
+    local glowKey = (prefix == "" and "show" .. typeStr .. "Glow" or prefix .. "Show" .. typeStr .. "Glow")
+    
+    local showSweep = KnackDB.settings[showKey]
+    local showGlow = KnackDB.settings[glowKey]
+    
+    if not showSweep then
+        overlay:Hide()
     else
-        self.gcdOverlay:Hide()
-        if self.nameplateFrame and self.nameplateFrame.gcdOverlay then
-            self.nameplateFrame.gcdOverlay:Hide()
+        if startTime and duration and duration > 0 then
+            overlay.startTime = startTime
+            overlay.duration = duration
+            overlay.endTime = startTime + duration
+            overlay.reverse = isChannel
+            overlay:Show()
+            if overlay.glow then
+                if showGlow then overlay.glow:Show() else overlay.glow:Hide() end
+            end
+        else
+            overlay:Hide()
         end
     end
 end
 
 function KnackDisplay:UpdateCast(startTime, duration)
-    local showSweep = KnackDB.settings.showCastSweep
-    local showGlow = KnackDB.settings.showCastGlow
-    
-    if not showSweep then
-        self.castOverlay:Hide()
-    else
-        if startTime and duration and duration > 0 then
-            self.castOverlay.startTime = startTime
-            self.castOverlay.duration = duration
-            self.castOverlay.endTime = startTime + duration
-            self.castOverlay.reverse = false
-            self.castOverlay:Show()
-            if self.castOverlay.glow then
-                if showGlow then self.castOverlay.glow:Show() else self.castOverlay.glow:Hide() end
-            end
-        else
-            self.castOverlay:Hide()
-        end
-    end
-
-    if self.nameplateFrame and self.nameplateFrame.castOverlay then
-        local npShowSweep = KnackDB.settings.nameplateShowCastSweep
-        local npShowGlow = KnackDB.settings.nameplateShowCastGlow
-        
-        if not npShowSweep then
-            self.nameplateFrame.castOverlay:Hide()
-        else
-            if startTime and duration and duration > 0 then
-                self.nameplateFrame.castOverlay.startTime = startTime
-                self.nameplateFrame.castOverlay.duration = duration
-                self.nameplateFrame.castOverlay.endTime = startTime + duration
-                self.nameplateFrame.castOverlay.reverse = false
-                self.nameplateFrame.castOverlay:Show()
-                if self.nameplateFrame.castOverlay.glow then
-                    if npShowGlow then self.nameplateFrame.castOverlay.glow:Show() else self.nameplateFrame.castOverlay.glow:Hide() end
-                end
-            else
-                self.nameplateFrame.castOverlay:Hide()
-            end
-        end
-    end
+    self:UpdateFrameSweep(self.frame, startTime, duration, false, "")
+    self:UpdateFrameSweep(self.nameplateFrame, startTime, duration, false, "nameplate")
 end
 
 function KnackDisplay:UpdateChannel(startTime, duration)
-    local showSweep = KnackDB.settings.showChannelSweep
-    local showGlow = KnackDB.settings.showChannelGlow
-    
-    if not showSweep then
-        self.channelOverlay:Hide()
-    else
-        if startTime and duration and duration > 0 then
-            self.channelOverlay.startTime = startTime
-            self.channelOverlay.duration = duration
-            self.channelOverlay.endTime = startTime + duration
-            self.channelOverlay.reverse = true
-            self.channelOverlay:Show()
-            if self.channelOverlay.glow then
-                if showGlow then self.channelOverlay.glow:Show() else self.channelOverlay.glow:Hide() end
-            end
-        else
-            self.channelOverlay:Hide()
-        end
-    end
-
-    if self.nameplateFrame and self.nameplateFrame.channelOverlay then
-        local npShowSweep = KnackDB.settings.nameplateShowChannelSweep
-        local npShowGlow = KnackDB.settings.nameplateShowChannelGlow
-        
-        if not npShowSweep then
-            self.nameplateFrame.channelOverlay:Hide()
-        else
-            if startTime and duration and duration > 0 then
-                self.nameplateFrame.channelOverlay.startTime = startTime
-                self.nameplateFrame.channelOverlay.duration = duration
-                self.nameplateFrame.channelOverlay.endTime = startTime + duration
-                self.nameplateFrame.channelOverlay.reverse = true
-                self.nameplateFrame.channelOverlay:Show()
-                if self.nameplateFrame.channelOverlay.glow then
-                    if npShowGlow then self.nameplateFrame.channelOverlay.glow:Show() else self.nameplateFrame.channelOverlay.glow:Hide() end
-                end
-            else
-                self.nameplateFrame.channelOverlay:Hide()
-            end
-        end
-    end
+    self:UpdateFrameSweep(self.frame, startTime, duration, true, "")
+    self:UpdateFrameSweep(self.nameplateFrame, startTime, duration, true, "nameplate")
 end
 
 function KnackDisplay:UpdateNameplateAttachment()
+    if not self.nameplateFrame or not self.nameplateFrame.icon then return end
+
     if not KnackDB.settings.attachToNameplate then
         self.nameplateFrame:Hide()
         return
     end
 
-    if not UnitExists("target") then
+    local unit = "target"
+    if not UnitExists(unit) or not UnitCanAttack("player", unit) or UnitIsDead(unit) then
         self.nameplateFrame:Hide()
         return
     end
 
-    local nameplate = C_NamePlate.GetNamePlateForUnit("target")
-    if nameplate then
-        self.nameplateFrame:SetParent(nameplate)
-        self.nameplateFrame:ClearAllPoints()
-        
-        local anchor = KnackDB.settings.nameplateAnchor or "TOP"
-        local offset = (KnackDB.settings.nameplateOffset or 0) - 13
-        local offsetX = KnackDB.settings.nameplateOffsetX or 0
-        local offsetY = KnackDB.settings.nameplateOffsetY or 0
-        
-        local p, rP, x, y = anchor, anchor, 0, 0
-        
-        if anchor == "TOP" then p = "BOTTOM"; rP = "TOP"; y = offset
-        elseif anchor == "BOTTOM" then p = "TOP"; rP = "BOTTOM"; y = -offset
-        elseif anchor == "LEFT" then p = "RIGHT"; rP = "LEFT"; x = -2 - offset
-        elseif anchor == "RIGHT" then p = "LEFT"; rP = "RIGHT"; x = 2 + offset
-        elseif anchor == "TOPLEFT" then p = "BOTTOMRIGHT"; rP = "TOPLEFT"; x = -offset; y = offset
-        elseif anchor == "TOPRIGHT" then p = "BOTTOMLEFT"; rP = "TOPRIGHT"; x = offset; y = offset
-        elseif anchor == "BOTTOMLEFT" then p = "TOPRIGHT"; rP = "BOTTOMLEFT"; x = -offset; y = -offset
-        elseif anchor == "BOTTOMRIGHT" then p = "TOPLEFT"; rP = "BOTTOMRIGHT"; x = offset; y = -offset
-        end
-        
-        self.nameplateFrame:SetPoint(p, nameplate, rP, x + offsetX, y + offsetY)
-        self.nameplateFrame:Show()
-        
-        local size = KnackDB.settings.nameplateIconSize or 32
-        self.nameplateFrame:SetSize(size, size)
-        self.nameplateFrame.icon:SetSize(size - CONSTANTS.ICON.PADDING, size - CONSTANTS.ICON.PADDING)
-        
-        -- Update font size when nameplate icon size changes
-        self:UpdateFont()
-    else
+    local nameplate = C_NamePlate.GetNamePlateForUnit(unit)
+    if not nameplate then
         self.nameplateFrame:Hide()
-    end
-end
-
-function KnackDisplay:UpdateNameplateBorder()
-    if not self.nameplateFrame or not self.nameplateFrame.border then return end
-
-    if not KnackDB.settings.nameplateShowBorder then
-        self.nameplateFrame.border:Hide()
         return
     end
 
-    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
-    local texture = (LSM and KnackDB.settings.nameplateBorderTexture) and LSM:Fetch("border", KnackDB.settings.nameplateBorderTexture) or "Interface\\Tooltips\\UI-Tooltip-Border"
+    local anchor = KnackDB.settings.nameplateAnchor or "TOP"
+    local offset = KnackDB.settings.nameplateOffset or 0
+    local xOfs = KnackDB.settings.nameplateOffsetX or 0
+    local yOfs = KnackDB.settings.nameplateOffsetY or 0
     
-    local edgeSize = KnackDB.settings.nameplateBorderWidth or KnackDefaultSettings.nameplateBorderWidth
-    local offset = KnackDB.settings.nameplateBorderOffset or KnackDefaultSettings.nameplateBorderOffset
-    
-    self.nameplateFrame.border:SetBackdrop({
-        edgeFile = texture,
-        edgeSize = edgeSize,
-        insets = { left = 0, right = 0, top = 0, bottom = 0 }
-    })
-    
-    self.nameplateFrame.border:ClearAllPoints()
-    self.nameplateFrame.border:SetPoint("TOPLEFT", self.nameplateFrame, "TOPLEFT", -(offset + edgeSize), (offset + edgeSize))
-    self.nameplateFrame.border:SetPoint("BOTTOMRIGHT", self.nameplateFrame, "BOTTOMRIGHT", (offset + edgeSize), -(offset + edgeSize))
-    
-    local color = KnackDB.settings.nameplateBorderColor or KnackDefaultSettings.nameplateBorderColor
-    self.nameplateFrame.border:SetBackdropBorderColor(color.r or color[1], color.g or color[2], color.b or color[3], color.a or color[4])
-    self.nameplateFrame.border:Show()
+    -- Adjust Y offset based on anchor and "distance" (offset)
+    if anchor:find("TOP") then
+        yOfs = yOfs + offset
+    elseif anchor:find("BOTTOM") then
+        yOfs = yOfs - offset
+    elseif anchor:find("LEFT") then
+        xOfs = xOfs - offset
+    elseif anchor:find("RIGHT") then
+        xOfs = xOfs + offset
+    end
+
+    self.nameplateFrame:ClearAllPoints()
+    self.nameplateFrame:SetPoint(anchor, nameplate, anchor, xOfs, yOfs)
+    self.nameplateFrame:Show()
 end
 
 function KnackDisplay:Update(spellID)
+    self.currentSpellID = spellID
+    
     if not spellID then
         self.frame:Hide()
-        self.currentSpellID = nil
+        self.nameplateFrame:Hide()
         return
     end
-
-    local spellInfo = C_Spell.GetSpellInfo(spellID)
-    if not spellInfo then
+    
+    local icon = C_Spell.GetSpellTexture(spellID)
+    if not icon then
         self.frame:Hide()
-        self.currentSpellID = nil
+        self.nameplateFrame:Hide()
         return
     end
-
+    
     -- Update Icon
-    local spellChanged = (self.currentSpellID ~= spellID)
-    self.currentSpellID = spellID
-    self.icon:SetTexture(spellInfo.iconID)
+    self.icon:SetTexture(icon)
+    self.nameplateFrame.icon:SetTexture(icon)
     
-    -- Update Nameplate Copy
-    if self.nameplateFrame then
-        self.nameplateFrame.icon:SetTexture(spellInfo.iconID)
-        self:UpdateNameplateAttachment()
-        self:UpdateNameplateBorder()
-    end
-    
-    -- Update Tooltip if needed
-    if spellChanged and GameTooltip:IsOwned(self.frame) and GameTooltip:IsShown() then
-        self:ShowTooltip()
-    end
-
     -- Update Hotkey
-    local hotkey, inRange = BindingUtils.GetHotkeyInfo(spellID)
-    self.hotkeyText:SetText(hotkey)
+    local hotkeyText, inRange = BindingUtils.GetHotkeyInfo(spellID)
+    self.hotkeyText:SetText(hotkeyText)
+    self.nameplateFrame.hotkeyText:SetText(hotkeyText)
     
     local color = inRange and CONSTANTS.FONT.COLOR_IN_RANGE or CONSTANTS.FONT.COLOR_OUT_OF_RANGE
     self.hotkeyText:SetTextColor(color.r, color.g, color.b, color.a)
-
-    -- Update Nameplate Hotkey
-    if self.nameplateFrame and self.nameplateFrame.hotkeyText then
-        self.nameplateFrame.hotkeyText:SetText(hotkey)
-        self.nameplateFrame.hotkeyText:SetTextColor(color.r, color.g, color.b, color.a)
-    end
-
-    -- Update GCD
-    -- self:UpdateGCD()
-
+    self.nameplateFrame.hotkeyText:SetTextColor(color.r, color.g, color.b, color.a)
+    
     self.frame:Show()
+    self:UpdateNameplateAttachment()
 end
 
 -- Core Logic
