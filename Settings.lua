@@ -820,8 +820,8 @@ local function CreateSettingsPanel()
     table.insert(builder.profileSpecificControls["Nameplate Icon"], npOffsetSlider)
 
     -- X Offset Slider
-    local npOffsetXSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetXSlider", -50, 50, KnackDB.settings.nameplateOffsetX or 0, 
-        "-50%", "50%",
+    local npOffsetXSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetXSlider", -100, 100, KnackDB.settings.nameplateOffsetX or 0, 
+        "-100%", "100%",
         function(v) return "X Offset: " .. v .. "%" end,
         function(v) 
             KnackDB.settings.nameplateOffsetX = v 
@@ -831,8 +831,8 @@ local function CreateSettingsPanel()
     table.insert(builder.profileSpecificControls["Nameplate Icon"], npOffsetXSlider)
     
     -- Y Offset Slider
-    local npOffsetYSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetYSlider", -50, 50, KnackDB.settings.nameplateOffsetY or 0, 
-        "-50%", "50%",
+    local npOffsetYSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetYSlider", -100, 100, KnackDB.settings.nameplateOffsetY or 0, 
+        "-100%", "100%",
         function(v) return "Y Offset: " .. v .. "%" end,
         function(v) 
             KnackDB.settings.nameplateOffsetY = v 
