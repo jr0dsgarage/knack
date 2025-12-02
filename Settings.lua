@@ -160,7 +160,7 @@ function SettingsBuilder:BeginScrollingGroup()
     local outer = CreateFrame("Frame", nil, self.container, "BackdropTemplate")
     
     -- Anchor to the last element (tabs) and fill down to the bottom of the panel
-    outer:SetPoint("TOPLEFT", self.lastAnchor, "BOTTOMLEFT", 0, -4) -- Small gap
+    outer:SetPoint("TOPLEFT", self.lastAnchor, "BOTTOMLEFT", 0, 10) -- Small gap
     outer:SetPoint("BOTTOMRIGHT", self.container, "BOTTOMRIGHT", -CONSTANTS.PADDING_LARGE, CONSTANTS.PADDING_LARGE)
     
     outer:SetBackdrop({
@@ -212,6 +212,7 @@ end
 function SettingsBuilder:BeginGroup()
     local group = CreateFrame("Frame", nil, self.container, "BackdropTemplate")
     group:SetPoint("TOPLEFT", self.lastAnchor, "BOTTOMLEFT", 0, self.yOffset)
+    group:SetPoint("RIGHT", self.container, "RIGHT", -CONSTANTS.PADDING_LARGE, 0)
     group.elements = {}
     group.currentY = -self.spacing.groupTop
     return group
@@ -219,7 +220,7 @@ end
 
 function SettingsBuilder:EndGroup(group)
     local totalHeight = math.abs(group.currentY) + self.spacing.groupBottom
-    group:SetSize(580, totalHeight)
+    group:SetHeight(totalHeight)
     
     group:SetBackdrop({
         bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
