@@ -132,15 +132,11 @@ SettingsBuilder.__index = SettingsBuilder
 
 function SettingsBuilder:New(name, parent)
     local panel = CreateFrame("Frame", "KnackSettingsPanel", parent)
+    panel:SetSize(600, 600) -- Ensure panel has a default size
     panel.name = name
     
-    local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 0, -CONSTANTS.PADDING_LARGE)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -30, CONSTANTS.PADDING_LARGE)
-    
-    local container = CreateFrame("Frame", nil, scrollFrame)
-    container:SetSize(600, 1000)
-    scrollFrame:SetScrollChild(container)
+    -- Removed global ScrollFrame to allow for fixed headers and scrolling content area
+    local container = panel
     
     local self = setmetatable({
         panel = panel,
@@ -158,6 +154,46 @@ function SettingsBuilder:New(name, parent)
     }, SettingsBuilder)
     
     return self
+end
+
+function SettingsBuilder:BeginScrollingGroup()
+    local outer = CreateFrame("Frame", nil, self.container, "BackdropTemplate")
+    
+    -- Anchor to the last element (tabs) and fill down to the bottom of the panel
+    outer:SetPoint("TOPLEFT", self.lastAnchor, "BOTTOMLEFT", 0, -4) -- Small gap
+    outer:SetPoint("BOTTOMRIGHT", self.container, "BOTTOMRIGHT", -CONSTANTS.PADDING_LARGE, CONSTANTS.PADDING_LARGE)
+    
+    outer:SetBackdrop({
+        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    outer:SetBackdropColor(0.1, 0.1, 0.1, 0.4)
+    outer:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
+    
+    local scrollFrame = CreateFrame("ScrollFrame", nil, outer, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 0, -4)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -26, 4)
+    
+    local content = CreateFrame("Frame", nil, scrollFrame)
+    content:SetSize(600, 100) -- Initial size, width matches panel roughly
+    scrollFrame:SetScrollChild(content)
+    
+    content.elements = {}
+    content.currentY = -self.spacing.groupTop
+    content.outer = outer
+    
+    return content
+end
+
+function SettingsBuilder:EndScrollingGroup(group)
+    local totalHeight = math.abs(group.currentY) + self.spacing.groupBottom
+    group:SetHeight(totalHeight)
+    
+    self.lastAnchor = group.outer
+    self.yOffset = -self.spacing.group
+    return group
 end
 
 function SettingsBuilder:AddTitle(titleText, subtitleText)
@@ -200,7 +236,7 @@ function SettingsBuilder:EndGroup(group)
 end
 
 function SettingsBuilder:AddCheckbox(group, label, tooltip, setting, callback, indent)
-    local check = CreateFrame("CheckButton", nil, self.container, "InterfaceOptionsCheckButtonTemplate")
+    local check = CreateFrame("CheckButton", nil, group, "InterfaceOptionsCheckButtonTemplate")
     check:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft + (indent or 0), group.currentY)
     check.Text:SetText(label)
     check.tooltipText = tooltip
@@ -218,27 +254,50 @@ function SettingsBuilder:AddCheckbox(group, label, tooltip, setting, callback, i
 end
 
 function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highText, labelFormat, callback, step, xOffset, yOverride, setting)
-    local slider = CreateFrame("Slider", name, self.container, "OptionsSliderTemplate")
+    local slider
+    local isModern = (_G["MinimalSliderWithSteppersTemplate"] ~= nil)
     
     local yPos = yOverride or (group.currentY - CONSTANTS.PADDING_LARGE)
     local xPos = self.spacing.groupLeft + CONSTANTS.PADDING_SMALL + (xOffset or 0)
     
-    slider:SetPoint("TOPLEFT", group, "TOPLEFT", xPos, yPos)
-    slider:SetMinMaxValues(min, max)
-    slider:SetValue(value or min)
-    slider:SetValueStep(step or 1)
-    slider:SetObeyStepOnDrag(true)
-    slider:SetWidth(CONSTANTS.SLIDER.WIDTH)
-    slider:SetFrameLevel(group:GetFrameLevel() + 1)
-    
-    _G[name .. "Low"]:SetText(lowText)
-    _G[name .. "High"]:SetText(highText)
-    _G[name .. "Text"]:SetText(labelFormat(value or min))
-    
-    slider:SetScript("OnValueChanged", function(self, v) 
-        _G[name .. "Text"]:SetText(labelFormat(v)) 
-        callback(v) 
-    end)
+    if isModern then
+        slider = CreateFrame("Frame", name, group, "MinimalSliderWithSteppersTemplate")
+        slider:SetPoint("TOPLEFT", group, "TOPLEFT", xPos, yPos)
+        slider:SetWidth(CONSTANTS.SLIDER.WIDTH)
+        slider:SetFrameLevel(group:GetFrameLevel() + 1)
+        
+        local steps = (max - min) / (step or 1)
+        slider:Init(value or min, min, max, steps, { Format = function() return "" end })
+        
+        slider.Label = slider:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        slider.Label:SetPoint("BOTTOM", slider, "TOP", 0, 0)
+        slider.Label:SetText(labelFormat(value or min))
+        
+        slider:RegisterCallback("OnValueChanged", function(_, v)
+            slider.Label:SetText(labelFormat(v))
+            callback(v)
+        end)
+        
+        slider.IsModernSlider = true
+    else
+        slider = CreateFrame("Slider", name, group, "OptionsSliderTemplate")
+        slider:SetPoint("TOPLEFT", group, "TOPLEFT", xPos, yPos)
+        slider:SetMinMaxValues(min, max)
+        slider:SetValue(value or min)
+        slider:SetValueStep(step or 1)
+        slider:SetObeyStepOnDrag(true)
+        slider:SetWidth(CONSTANTS.SLIDER.WIDTH)
+        slider:SetFrameLevel(group:GetFrameLevel() + 1)
+        
+        _G[name .. "Low"]:SetText(lowText)
+        _G[name .. "High"]:SetText(highText)
+        _G[name .. "Text"]:SetText(labelFormat(value or min))
+        
+        slider:SetScript("OnValueChanged", function(self, v) 
+            _G[name .. "Text"]:SetText(labelFormat(v)) 
+            callback(v) 
+        end)
+    end
     
     if setting then
         slider.settingKey = setting
@@ -255,7 +314,7 @@ function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highTe
 end
 
 function SettingsBuilder:AddButton(group, text, width, callback)
-    local button = CreateFrame("Button", nil, self.container, "UIPanelButtonTemplate")
+    local button = CreateFrame("Button", nil, group, "SharedButtonSmallTemplate")
     button:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
     button:SetSize(width, CONSTANTS.BUTTON_HEIGHT)
     button:SetText(text)
@@ -291,12 +350,60 @@ function SettingsBuilder:AddHeader(group, text)
     return fontString
 end
 
+function SettingsBuilder:AddTabs(group, items, currentValue, callback)
+    local container = CreateFrame("Frame", nil, group)
+    container:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
+    container:SetSize(1, 30)
+    
+    local buttons = {}
+    local xOffset = 0
+    
+    for i, item in ipairs(items) do
+        -- Unique name is required for PanelTemplates to find textures via _G in some versions
+        local btnName = "KnackTab" .. math.random(1000000)
+        local btn = CreateFrame("Button", btnName, container, "PanelTopTabButtonTemplate")
+        
+        btn:SetID(i)
+        btn:SetText(item)
+        btn:SetPoint("LEFT", container, "LEFT", xOffset, 0)
+        
+        -- Auto-resize tab to fit text
+        if PanelTemplates_TabResize then
+            PanelTemplates_TabResize(btn, 10)
+        else
+            local textWidth = btn:GetFontString():GetStringWidth()
+            btn:SetWidth(textWidth + 20)
+        end
+        
+        btn:SetScript("OnClick", function(self)
+            for _, b in ipairs(buttons) do 
+                if PanelTemplates_DeselectTab then PanelTemplates_DeselectTab(b) else b:Enable() end
+            end
+            if PanelTemplates_SelectTab then PanelTemplates_SelectTab(self) else self:Disable() end
+            callback(item)
+        end)
+        
+        if item == currentValue then
+            if PanelTemplates_SelectTab then PanelTemplates_SelectTab(btn) else btn:Disable() end
+        else
+            if PanelTemplates_DeselectTab then PanelTemplates_DeselectTab(btn) else btn:Enable() end
+        end
+        
+        table.insert(buttons, btn)
+        xOffset = xOffset + btn:GetWidth() - 4 -- Slight overlap for connected look
+    end
+    
+    group.currentY = group.currentY - (30 + self.spacing.item)
+    table.insert(group.elements, container)
+    return container
+end
+
 function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, callback, setting)
     local label = group:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     label:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
     label:SetText(labelText)
     
-    local dropdown = CreateFrame("Frame", "KnackDropdown" .. (setting or math.random(1000)), self.container, "UIDropDownMenuTemplate")
+    local dropdown = CreateFrame("Frame", "KnackDropdown" .. (setting or math.random(1000)), group, "UIDropDownMenuTemplate")
     dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft - CONSTANTS.PADDING_LARGE, group.currentY - 20)
     UIDropDownMenu_SetWidth(dropdown, CONSTANTS.DROPDOWN_WIDTH)
     UIDropDownMenu_SetText(dropdown, currentValue)
@@ -349,7 +456,7 @@ function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, call
 end
 
 function SettingsBuilder:AddColorPicker(group, label, setting, callback, relativeTo)
-    local button = CreateFrame("Button", nil, self.container)
+    local button = CreateFrame("Button", nil, group)
     button:SetSize(20, 20)
     button:SetFrameLevel(group:GetFrameLevel() + 1)
     
@@ -505,6 +612,10 @@ local function UpdatePanelValues(builder)
         if control:GetObjectType() == "CheckButton" then
             control:SetChecked(value)
             
+        elseif control.IsModernSlider then
+            control:SetValue(value or 0)
+            if control.Label then control.Label:SetText(control.labelFormat(value or 0)) end
+            
         elseif control:GetObjectType() == "Slider" then
             control:SetValue(value or 0)
             _G[control.name .. "Text"]:SetText(control.labelFormat(value or 0))
@@ -549,23 +660,10 @@ local function CreateSettingsPanel()
         KnackDB.settings.enabled = self:GetChecked()
         KnackUpdateVisibility()
     end)
-    builder:AddCheckbox(globalGroup, "Only show with enemy target", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
-        KnackDB.settings.onlyWithEnemyTarget = self:GetChecked()
-    end)
-    
-    builder:AddCheckbox(globalGroup, "Attach copy to Nameplate", "Attach a copy of the icon to the current target's nameplate", "attachToNameplate", function(self)
-        KnackDB.settings.attachToNameplate = self:GetChecked()
-        if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
-    end)
     builder:EndGroup(globalGroup)
 
-    -- GROUP 2: Configuration Table (Main Container)
-    local configGroup = builder:BeginGroup()
-    configGroup.rows = {} -- Store rows for dynamic resizing
-    
-    builder:AddHeader(configGroup, "Configure Icon")
-    
-    -- Profile Selector (Top of the table)
+    -- TABS (Outside of Configuration Group)
+    local tabsGroup = builder:BeginGroup()
     local availableProfiles = {}
     for _, p in ipairs(profiles) do
         if not p.condition or p.condition() then
@@ -573,12 +671,44 @@ local function CreateSettingsPanel()
         end
     end
     
-    builder:AddDropdown(configGroup, "Profile:", availableProfiles, currentProfile, function(val)
+    builder:AddTabs(tabsGroup, availableProfiles, currentProfile, function(val)
         currentProfile = val
         UpdatePanelValues(builder)
         if ReflowConfigGroup then ReflowConfigGroup() end
     end)
+    builder:EndGroup(tabsGroup)
+    tabsGroup:SetBackdrop(nil) -- Make tabs group transparent
+
+    -- GROUP 2: Configuration Table (Main Container)
+    local configGroup = builder:BeginScrollingGroup()
+    configGroup.rows = {} 
     
+    -- Profile Specific Options (Overlapping)
+    local startY = configGroup.currentY
+    
+    -- Main Display Option: Only show with enemy target
+    local cbMain = builder:AddCheckbox(configGroup, "Only show with enemy target", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
+        KnackDB.settings.onlyWithEnemyTarget = self:GetChecked()
+    end)
+    table.insert(builder.profileSpecificControls["Main Display"], cbMain)
+    
+    local afterMainY = configGroup.currentY
+    
+    -- Reset Y for Nameplate option
+    configGroup.currentY = startY
+    
+    -- Nameplate Display Option: Attach copy to Nameplate
+    local cbNameplate = builder:AddCheckbox(configGroup, "Attach copy to Nameplate", "Attach a copy of the icon to the current target's nameplate", "attachToNameplate", function(self)
+        KnackDB.settings.attachToNameplate = self:GetChecked()
+        if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
+    end)
+    table.insert(builder.profileSpecificControls["Nameplate Display"], cbNameplate)
+    
+    -- Continue from the lower Y
+    configGroup.currentY = math.min(afterMainY, configGroup.currentY)
+    
+    local initialRowY = configGroup.currentY
+
     -- Row 1: Size & Position
     local sizeRow = builder:BeginSubGroup(configGroup)
     builder:AddHeader(sizeRow, "Size & Position")
@@ -693,7 +823,7 @@ local function CreateSettingsPanel()
     end, "BorderTexture")
     
     -- Color Picker
-    local cpButton = CreateFrame("Button", nil, builder.container)
+    local cpButton = CreateFrame("Button", nil, borderRow)
     cpButton:SetSize(20, 20)
     cpButton:SetPoint("LEFT", borderDropdown, "RIGHT", 10, 2)
     
@@ -858,12 +988,11 @@ local function CreateSettingsPanel()
     builder:EndSubGroup(timersRow, configGroup)
     table.insert(configGroup.rows, timersRow)
     
-    builder:EndGroup(configGroup)
+    builder:EndScrollingGroup(configGroup)
     
     -- Define Reflow function
     ReflowConfigGroup = function()
-        local _, _, _, _, startY = sizeRow:GetPoint()
-        local currentY = startY
+        local currentY = initialRowY
         
         for _, row in ipairs(configGroup.rows) do
             if row == sizeRow then
