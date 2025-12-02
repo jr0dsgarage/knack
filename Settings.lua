@@ -2,6 +2,38 @@
 local addonName = ...
 local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 
+-- Fallback for LSM if not present
+if not LSM then
+    LSM = {
+        Fetch = function(self, mediaType, name)
+            if mediaType == "font" then
+                local fonts = {
+                    ["Friz Quadrata TT"] = "Fonts\\FRIZQT__.TTF",
+                    ["Arial Narrow"] = "Fonts\\ARIALN.TTF",
+                    ["Skurri"] = "Fonts\\SKURRI.TTF",
+                    ["Morpheus"] = "Fonts\\MORPHEUS.TTF"
+                }
+                return fonts[name]
+            elseif mediaType == "border" then
+                local borders = {
+                    ["Blizzard Tooltip"] = "Interface\\Tooltips\\UI-Tooltip-Border",
+                    ["Blizzard Dialog"] = "Interface\\DialogFrame\\UI-DialogBox-Border"
+                }
+                return borders[name]
+            end
+            return nil
+        end,
+        List = function(self, mediaType)
+            if mediaType == "font" then
+                return {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
+            elseif mediaType == "border" then
+                return {"Blizzard Tooltip", "Blizzard Dialog"}
+            end
+            return {}
+        end
+    }
+end
+
 -- Constants
 local CONSTANTS = {
     PADDING_LARGE = 16,
