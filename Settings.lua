@@ -616,10 +616,10 @@ function SettingsBuilder:EndSubGroup(group, parentGroup)
 end
 
 -- Profile Management
-local currentProfile = "Main Display"
+local currentProfile = "Main Icon"
 local profiles = {
-    { name = "Main Display", prefix = "" },
-    { name = "Nameplate Display", prefix = "nameplate" }
+    { name = "Main Icon", prefix = "" },
+    { name = "Nameplate Icon", prefix = "nameplate" }
 }
 
 local globalKeys = {
@@ -704,7 +704,7 @@ end
 local function CreateSettingsPanel()
     local builder = SettingsBuilder:New("knack", UIParent)
     builder:AddTitle("knack - Next Assisted Combat", "Configure the next assisted combat spell icon display")
-    builder.profileSpecificControls = { ["Main Display"] = {}, ["Nameplate Display"] = {} }
+    builder.profileSpecificControls = { ["Main Icon"] = {}, ["Nameplate Icon"] = {} }
     
     -- Forward declaration for reflow function
     local ReflowConfigGroup
@@ -742,23 +742,23 @@ local function CreateSettingsPanel()
     -- Profile Specific Options (Overlapping)
     local startY = configGroup.currentY
     
-    -- Main Display Option: Only show with enemy target
-    local cbMain = builder:AddCheckbox(configGroup, "Only show with enemy target", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
+    -- Main Icon Option: Only show when an Enemy is targeted
+    local cbMain = builder:AddCheckbox(configGroup, "Only show when an Enemy is targeted", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
         KnackDB.settings.onlyWithEnemyTarget = self:GetChecked()
     end)
-    table.insert(builder.profileSpecificControls["Main Display"], cbMain)
+    table.insert(builder.profileSpecificControls["Main Icon"], cbMain)
     
     local afterMainY = configGroup.currentY
     
     -- Reset Y for Nameplate option
     configGroup.currentY = startY
     
-    -- Nameplate Display Option: Attach copy to Nameplate
-    local cbNameplate = builder:AddCheckbox(configGroup, "Attach copy to Nameplate", "Attach a copy of the icon to the current target's nameplate", "attachToNameplate", function(self)
+    -- Nameplate Icon Option: Attach copy to Nameplate
+    local cbNameplate = builder:AddCheckbox(configGroup, "Attach copy to Current Target's Nameplate", "Attach a copy of the icon to the current target's nameplate", "attachToNameplate", function(self)
         KnackDB.settings.attachToNameplate = self:GetChecked()
         if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
     end)
-    table.insert(builder.profileSpecificControls["Nameplate Display"], cbNameplate)
+    table.insert(builder.profileSpecificControls["Nameplate Icon"], cbNameplate)
     
     -- Continue from the lower Y
     configGroup.currentY = math.min(afterMainY, configGroup.currentY)
@@ -776,7 +776,7 @@ local function CreateSettingsPanel()
         function(v)
             SetSetting("IconSize", v)
             KnackUpdateIconSize()
-            if currentProfile ~= "Main Display" then KnackUpdateNameplateAttachment() end
+            if currentProfile ~= "Main Icon" then KnackUpdateNameplateAttachment() end
         end, nil, 0, nil, "IconSize")
 
     local startY = sizeRow.currentY
@@ -786,13 +786,13 @@ local function CreateSettingsPanel()
         KnackResetPosition()
         print("|cff00ff00[knack]|r position reset to center.")
     end)
-    table.insert(builder.profileSpecificControls["Main Display"], mainResetBtn)
+    table.insert(builder.profileSpecificControls["Main Icon"], mainResetBtn)
     
     local mainText1 = builder:AddText(sizeRow, "Hold SHIFT and use the scrollwheel to resize the spell icon", CONSTANTS.GRAY_TEXT)
-    table.insert(builder.profileSpecificControls["Main Display"], mainText1)
+    table.insert(builder.profileSpecificControls["Main Icon"], mainText1)
     
     local mainText2 = builder:AddText(sizeRow, "Hold SHIFT and drag the spell icon to reposition it.", CONSTANTS.GRAY_TEXT)
-    table.insert(builder.profileSpecificControls["Main Display"], mainText2)
+    table.insert(builder.profileSpecificControls["Main Icon"], mainText2)
     
     local mainY = sizeRow.currentY
     
@@ -804,8 +804,10 @@ local function CreateSettingsPanel()
         KnackDB.settings.nameplateAnchor = val
         if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
     end)
-    table.insert(builder.profileSpecificControls["Nameplate Display"], npAnchorDropdown)
-    table.insert(builder.profileSpecificControls["Nameplate Display"], npAnchorDropdown.label)
+    table.insert(builder.profileSpecificControls["Nameplate Icon"], npAnchorDropdown)
+    table.insert(builder.profileSpecificControls["Nameplate Icon"], npAnchorDropdown.label)
+
+    local rowY = sizeRow.currentY
 
     local npOffsetSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetSlider", 0, 13, KnackDB.settings.nameplateOffset or 1, 
         "0", "13",
@@ -814,8 +816,8 @@ local function CreateSettingsPanel()
             KnackDB.settings.nameplateOffset = v 
             if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
         end,
-        nil, 0, nil)
-    table.insert(builder.profileSpecificControls["Nameplate Display"], npOffsetSlider)
+        nil, 220, startY - 20)
+    table.insert(builder.profileSpecificControls["Nameplate Icon"], npOffsetSlider)
 
     -- X Offset Slider
     local npOffsetXSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetXSlider", -50, 50, KnackDB.settings.nameplateOffsetX or 0, 
@@ -825,8 +827,8 @@ local function CreateSettingsPanel()
             KnackDB.settings.nameplateOffsetX = v 
             if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
         end,
-        nil, 0, nil)
-    table.insert(builder.profileSpecificControls["Nameplate Display"], npOffsetXSlider)
+        nil, 0, startY - 80)
+    table.insert(builder.profileSpecificControls["Nameplate Icon"], npOffsetXSlider)
     
     -- Y Offset Slider
     local npOffsetYSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetYSlider", -50, 50, KnackDB.settings.nameplateOffsetY or 0, 
@@ -836,15 +838,17 @@ local function CreateSettingsPanel()
             KnackDB.settings.nameplateOffsetY = v 
             if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
         end,
-        nil, 0, nil)
-    table.insert(builder.profileSpecificControls["Nameplate Display"], npOffsetYSlider)
+        nil, 220, startY - 80)
+    table.insert(builder.profileSpecificControls["Nameplate Icon"], npOffsetYSlider)
+    
+    sizeRow.currentY = startY - 80 - CONSTANTS.SLIDER.HEIGHT - CONSTANTS.PADDING_SMALL
 
     local npY = sizeRow.currentY
     
     -- Store heights for dynamic resizing
     sizeRow.profileHeights = {
-        ["Main Display"] = math.abs(mainY) + builder.spacing.groupBottom,
-        ["Nameplate Display"] = math.abs(npY) + builder.spacing.groupBottom
+        ["Main Icon"] = math.abs(mainY) + builder.spacing.groupBottom,
+        ["Nameplate Icon"] = math.abs(npY) + builder.spacing.groupBottom
     }
     
     -- Set initial height based on current profile
@@ -859,7 +863,7 @@ local function CreateSettingsPanel()
     
     builder:AddCheckbox(borderRow, "Show Border", "Show a border around the icon", "ShowBorder", function(self)
         SetSetting("ShowBorder", self:GetChecked())
-        if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+        if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
     end, 0)
     
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
@@ -875,7 +879,7 @@ local function CreateSettingsPanel()
     
     local borderDropdown = builder:AddDropdown(borderRow, "Border Texture:", borderList, "Blizzard Tooltip", function(val)
         SetSetting("BorderTexture", val)
-        if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+        if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
     end, "BorderTexture")
     
     -- Color Picker
@@ -907,13 +911,13 @@ local function CreateSettingsPanel()
             
             KnackDB.settings[settingKey] = {newR, newG, newB, newA}
             cpButton.swatch:SetColorTexture(newR, newG, newB, newA)
-            if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+            if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
         end
         
         local function OnCancel()
             KnackDB.settings[settingKey] = {r, g, b, a}
             cpButton.swatch:SetColorTexture(r, g, b, a)
-            if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+            if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
         end
         
         if ColorPickerFrame.SetupColorPickerAndShow then
@@ -950,7 +954,7 @@ local function CreateSettingsPanel()
         function(v) return "Border Thickness: " .. v end,
         function(v) 
             SetSetting("BorderWidth", v) 
-            if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+            if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
         end,
         nil, 0, rowY - CONSTANTS.PADDING_LARGE, "BorderWidth")
         
@@ -959,7 +963,7 @@ local function CreateSettingsPanel()
         function(v) return "Border Offset: " .. v end,
         function(v) 
             SetSetting("BorderOffset", v) 
-            if currentProfile == "Main Display" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+            if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
         end,
         nil, 220, rowY - CONSTANTS.PADDING_LARGE, "BorderOffset")
         
