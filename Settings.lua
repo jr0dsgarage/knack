@@ -404,48 +404,100 @@ function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, call
     label:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
     label:SetText(labelText)
     
-    local dropdown = CreateFrame("Frame", "KnackDropdown" .. (setting or math.random(1000)), group, "UIDropDownMenuTemplate")
-    dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft - CONSTANTS.PADDING_LARGE, group.currentY - 20)
-    UIDropDownMenu_SetWidth(dropdown, CONSTANTS.DROPDOWN_WIDTH)
-    UIDropDownMenu_SetText(dropdown, currentValue)
-    dropdown:SetFrameLevel(group:GetFrameLevel() + 1)
-    
+    local dropdown
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     
-    local function InitializeDropdown(self, level)
-        local selectedValue = currentValue
-        if setting then
-            selectedValue = GetSetting(setting)
+    if _G["WowStyle1DropdownTemplate"] then
+        dropdown = CreateFrame("DropdownButton", nil, group, "WowStyle1DropdownTemplate")
+        dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY - 20)
+        dropdown:SetWidth(CONSTANTS.DROPDOWN_WIDTH)
+        
+        local function SetDropdownText(text)
+            dropdown:SetText(text)
         end
-
-        for _, item in ipairs(items) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = item
-            info.func = function()
-                UIDropDownMenu_SetText(dropdown, item)
-                callback(item)
-            end
-            info.checked = (item == selectedValue)
+        
+        SetDropdownText(currentValue)
+        
+        dropdown:SetupMenu(function(dropdown, rootDescription)
+            rootDescription:SetTag("KnackDropdown")
             
-            if LSM then
-                local fontPath = LSM:Fetch("font", item)
-                if fontPath then
-                    info.fontObject = CreateFont("KnackDropdownFont_" .. item:gsub("[^%w]", ""))
-                    info.fontObject:SetFont(fontPath, 12, "OUTLINE")
+            local selectedValue = currentValue
+            if setting then
+                selectedValue = GetSetting(setting)
+            end
+            
+            for _, item in ipairs(items) do
+                local button = rootDescription:CreateButton(item, function()
+                    SetDropdownText(item)
+                    callback(item)
+                end)
+                
+                button:SetIsSelected(function() return item == selectedValue end)
+                
+                if LSM then
+                    local fontPath = LSM:Fetch("font", item)
+                    if fontPath then
+                        button:AddInitializer(function(btn, description, menu)
+                            local fontString = btn.fontString or btn.Text or (btn.GetFontString and btn:GetFontString())
+                            if fontString then
+                                local _, height, flags = fontString:GetFont()
+                                fontString:SetFont(fontPath, height, flags)
+                            end
+                        end)
+                    end
                 end
             end
-            
-            UIDropDownMenu_AddButton(info)
+        end)
+        
+        if setting then
+            dropdown.settingKey = setting
+            dropdown.UpdateValue = function(self, val)
+                SetDropdownText(val)
+            end
+            table.insert(self.controls, dropdown)
         end
-    end
-    
-    UIDropDownMenu_Initialize(dropdown, InitializeDropdown)
-    
-    if setting then
-        dropdown.settingKey = setting
-        dropdown.items = items
-        dropdown.InitializeDropdown = InitializeDropdown
-        table.insert(self.controls, dropdown)
+    else
+        dropdown = CreateFrame("Frame", "KnackDropdown" .. (setting or math.random(1000)), group, "UIDropDownMenuTemplate")
+        dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft - CONSTANTS.PADDING_LARGE, group.currentY - 20)
+        UIDropDownMenu_SetWidth(dropdown, CONSTANTS.DROPDOWN_WIDTH)
+        UIDropDownMenu_SetText(dropdown, currentValue)
+        dropdown:SetFrameLevel(group:GetFrameLevel() + 1)
+        
+        local function InitializeDropdown(self, level)
+            local selectedValue = currentValue
+            if setting then
+                selectedValue = GetSetting(setting)
+            end
+
+            for _, item in ipairs(items) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = item
+                info.func = function()
+                    UIDropDownMenu_SetText(dropdown, item)
+                    callback(item)
+                end
+                info.checked = (item == selectedValue)
+                
+                if LSM then
+                    local fontPath = LSM:Fetch("font", item)
+                    if fontPath then
+                        info.fontObject = CreateFont("KnackDropdownFont_" .. item:gsub("[^%w]", ""))
+                        info.fontObject:SetFont(fontPath, 12, "OUTLINE")
+                    end
+                end
+                
+                UIDropDownMenu_AddButton(info)
+            end
+        end
+        
+        UIDropDownMenu_Initialize(dropdown, InitializeDropdown)
+        
+        if setting then
+            dropdown.settingKey = setting
+            dropdown.items = items
+            dropdown.InitializeDropdown = InitializeDropdown
+            table.insert(self.controls, dropdown)
+        end
     end
     
     dropdown.label = label
@@ -624,6 +676,9 @@ local function UpdatePanelValues(builder)
         elseif control:GetObjectType() == "Button" and control.swatch then -- ColorPicker
             local r, g, b, a = unpack(value or {1, 1, 1, 1})
             control.swatch:SetColorTexture(r, g, b, a)
+            
+        elseif control.UpdateValue then -- Modern Dropdown
+            control:UpdateValue(value)
             
         elseif control:GetObjectType() == "Frame" and control.InitializeDropdown then -- Dropdown
             UIDropDownMenu_SetText(control, value)
