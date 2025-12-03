@@ -426,6 +426,29 @@ function KnackDisplay:UpdateFrameFont(frame, prefix)
     frame.hotkeyText:SetFont(fontPath, size, "OUTLINE")
 end
 
+function KnackDisplay:UpdateFrameHotkeyPosition(frame, prefix)
+    if not frame or not frame.hotkeyText then return end
+    
+    local anchorKey = (prefix == "" and "hotkeyAnchor" or prefix .. "HotkeyAnchor")
+    local anchor = KnackDB.settings[anchorKey] or "TOPRIGHT"
+    
+    frame.hotkeyText:ClearAllPoints()
+    frame.hotkeyText:SetPoint(anchor, frame.icon, anchor, CONSTANTS.FONT.OFFSET, CONSTANTS.FONT.OFFSET)
+    
+    if anchor:find("LEFT") then
+        frame.hotkeyText:SetJustifyH("LEFT")
+    elseif anchor:find("RIGHT") then
+        frame.hotkeyText:SetJustifyH("RIGHT")
+    else
+        frame.hotkeyText:SetJustifyH("CENTER")
+    end
+end
+
+function KnackDisplay:UpdateHotkeyPosition()
+    self:UpdateFrameHotkeyPosition(self.frame, "")
+    self:UpdateFrameHotkeyPosition(self.nameplateFrame, "nameplate")
+end
+
 function KnackDisplay:UpdateFont()
     self:UpdateFrameFont(self.frame, "")
     self:UpdateFrameFont(self.nameplateFrame, "nameplate")
@@ -685,6 +708,7 @@ end
 function Knack:OnLoad()
     self.display:UpdateSize()
     self.display:UpdateFont()
+    self.display:UpdateHotkeyPosition()
     self.display:UpdateGCD()
     print("|cff00ff00[knack]|r loaded. Hold SHIFT to move and resize the icon.")
 end
@@ -747,6 +771,7 @@ function KnackUpdateVisibility() Knack:Update() end
 function KnackUpdateGCDOverlay() Knack.display:UpdateGCD() end
 function KnackUpdateHotkeyFont() Knack.display:UpdateFont() end
 function KnackUpdateHotkeySize() Knack.display:UpdateFont() end
+function KnackUpdateHotkeyPosition() Knack.display:UpdateHotkeyPosition() end
 function KnackUpdateIconSize() Knack.display:UpdateSize() end
 function KnackUpdateBorder() Knack.display:UpdateBorder() end
 function KnackResetPosition() 

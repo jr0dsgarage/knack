@@ -1,38 +1,5 @@
 -- Knack Settings Panel
 local addonName = ...
-local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
-
--- Fallback for LSM if not present
-if not LSM then
-    LSM = {
-        Fetch = function(self, mediaType, name)
-            if mediaType == "font" then
-                local fonts = {
-                    ["Friz Quadrata TT"] = "Fonts\\FRIZQT__.TTF",
-                    ["Arial Narrow"] = "Fonts\\ARIALN.TTF",
-                    ["Skurri"] = "Fonts\\SKURRI.TTF",
-                    ["Morpheus"] = "Fonts\\MORPHEUS.TTF"
-                }
-                return fonts[name]
-            elseif mediaType == "border" then
-                local borders = {
-                    ["Blizzard Tooltip"] = "Interface\\Tooltips\\UI-Tooltip-Border",
-                    ["Blizzard Dialog"] = "Interface\\DialogFrame\\UI-DialogBox-Border"
-                }
-                return borders[name]
-            end
-            return nil
-        end,
-        List = function(self, mediaType)
-            if mediaType == "font" then
-                return {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
-            elseif mediaType == "border" then
-                return {"Blizzard Tooltip", "Blizzard Dialog"}
-            end
-            return {}
-        end
-    }
-end
 
 -- Constants
 local CONSTANTS = {
@@ -53,7 +20,7 @@ local CONSTANTS = {
     },
     
     BUTTON_HEIGHT = 22,
-    DROPDOWN_WIDTH = 220,
+    DROPDOWN_WIDTH = 200,
     DROPDOWN_HEIGHT = 50,
     
     ALPHA = {
@@ -80,6 +47,7 @@ KnackDefaultSettings = {
     nameplateBorderColor = {1, 1, 1, 1},
     nameplateHotkeyFont = "Friz Quadrata TT",
     nameplateHotkeySize = 10,
+    nameplateHotkeyAnchor = "TOPRIGHT",
     nameplateShowTooltip = false,
     nameplateHideTooltipInCombat = false,
     nameplateShowGCD = true,
@@ -99,6 +67,7 @@ KnackDefaultSettings = {
     
     hotkeySize = 14, 
     hotkeyFont = "Friz Quadrata TT", 
+    hotkeyAnchor = "TOPRIGHT",
     iconSize = 64, 
     showTooltip = true, 
     hideTooltipInCombat = false,
@@ -118,10 +87,10 @@ function KnackInitializeSettings()
 end
 
 -- Profile Management
-local currentProfile = "Main Icon"
+local currentProfile = "Main Display"
 local profiles = {
-    { name = "Main Icon", prefix = "" },
-    { name = "Nameplate Icon", prefix = "nameplate" }
+    { name = "Main Display", prefix = "" },
+    { name = "Nameplate Display", prefix = "nameplate" }
 }
 
 local globalKeys = {
@@ -183,7 +152,8 @@ function SettingsBuilder:New(name, parent)
             groupLeft = 10,
             item = 4
         },
-        controls = {} -- Store controls for updates
+        controls = {}, -- Store controls for updates
+        groups = {} -- Store groups for visibility updates
     }, SettingsBuilder)
     
     return self
@@ -197,14 +167,16 @@ function SettingsBuilder:BeginScrollingGroup()
     outer:SetPoint("BOTTOMRIGHT", self.container, "BOTTOMRIGHT", -CONSTANTS.PADDING_LARGE, CONSTANTS.PADDING_LARGE)
     
     outer:SetBackdrop({
+        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 16,
+        tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    outer:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    outer:SetBackdropColor(0.1, 0.1, 0.1, 0.4)
+    outer:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
     
     local scrollFrame = CreateFrame("ScrollFrame", nil, outer, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 4, -4)
+    scrollFrame:SetPoint("TOPLEFT", 0, -4)
     scrollFrame:SetPoint("BOTTOMRIGHT", -26, 4)
     
     local content = CreateFrame("Frame", nil, scrollFrame)
@@ -268,53 +240,21 @@ function SettingsBuilder:EndGroup(group)
 end
 
 function SettingsBuilder:AddCheckbox(group, label, tooltip, setting, callback, indent)
-    local check
-    if _G["SettingsCheckBoxControlTemplate"] then
-        check = CreateFrame("Frame", nil, group, "SettingsCheckBoxControlTemplate")
-        check:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft + (indent or 0), group.currentY)
-        check:SetSize(300, 26)
-        
-        check.CheckBox:SetScript("OnClick", function(self)
-            if callback then callback(self) end
-        end)
-        
-        if check.CheckBox.SetLabel then
-            check.CheckBox:SetLabel(label)
-        else
-            -- Fallback if SetLabel isn't available on the CheckBox
-            local fontString = check.Label or check.CheckBox.Label or check.CheckBox.Text
-            if fontString then fontString:SetText(label) end
-        end
-        
-        check.CheckBox.tooltipText = tooltip
-        
-        if setting then
-            check.settingKey = setting
-            check.SetChecked = function(self, val) self.CheckBox:SetChecked(val) end
-            check.GetChecked = function(self) return self.CheckBox:GetChecked() end
-            table.insert(self.controls, check)
-        end
-        
-        group.currentY = group.currentY - (check:GetHeight() + self.spacing.item)
-        table.insert(group.elements, check)
-        return check
-    else
-        check = CreateFrame("CheckButton", nil, group, "InterfaceOptionsCheckButtonTemplate")
-        check:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft + (indent or 0), group.currentY)
-        check.Text:SetText(label)
-        check.tooltipText = tooltip
-        check:SetScript("OnClick", callback)
-        check:SetFrameLevel(group:GetFrameLevel() + 1)
-        
-        if setting then
-            check.settingKey = setting
-            table.insert(self.controls, check)
-        end
-        
-        group.currentY = group.currentY - (check:GetHeight() + self.spacing.item)
-        table.insert(group.elements, check)
-        return check
+    local check = CreateFrame("CheckButton", nil, group, "InterfaceOptionsCheckButtonTemplate")
+    check:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft + (indent or 0), group.currentY)
+    check.Text:SetText(label)
+    check.tooltipText = tooltip
+    check:SetScript("OnClick", callback)
+    check:SetFrameLevel(group:GetFrameLevel() + 1)
+    
+    if setting then
+        check.settingKey = setting
+        table.insert(self.controls, check)
     end
+    
+    group.currentY = group.currentY - (check:GetHeight() + self.spacing.item)
+    table.insert(group.elements, check)
+    return check
 end
 
 function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highText, labelFormat, callback, step, xOffset, yOverride, setting)
@@ -378,8 +318,7 @@ function SettingsBuilder:AddSlider(group, name, min, max, value, lowText, highTe
 end
 
 function SettingsBuilder:AddButton(group, text, width, callback)
-    local template = "UIPanelButtonTemplate"
-    local button = CreateFrame("Button", nil, group, template)
+    local button = CreateFrame("Button", nil, group, "SharedButtonSmallTemplate")
     button:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
     button:SetSize(width, CONSTANTS.BUTTON_HEIGHT)
     button:SetText(text)
@@ -407,8 +346,15 @@ end
 function SettingsBuilder:AddHeader(group, text)
     group.currentY = group.currentY - 8
     local fontString = group:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    fontString:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
+    
+    if group.twistie then
+        fontString:SetPoint("LEFT", group.twistie, "RIGHT", 4, 0)
+    else
+        fontString:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
+    end
+    
     fontString:SetText(text)
+    fontString.isHeader = true
     
     group.currentY = group.currentY - (fontString:GetHeight() + self.spacing.item)
     table.insert(group.elements, fontString)
@@ -464,21 +410,16 @@ function SettingsBuilder:AddTabs(group, items, currentValue, callback)
 end
 
 function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, callback, setting)
-    local dropdown
+    local label = group:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    label:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
+    label:SetText(labelText)
     
-    if _G["SettingsDropdownControlTemplate"] then
-        local control = CreateFrame("Frame", nil, group, "SettingsDropdownControlTemplate")
-        control:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
-        control:SetSize(550, 26)
-        
-        if control.Label then
-            control.Label:SetText(labelText)
-            control.Label:SetJustifyH("LEFT")
-            -- Ensure label doesn't overlap dropdown
-            control.Label:SetPoint("RIGHT", control.Dropdown, "LEFT", -10, 0)
-        end
-        
-        dropdown = control.Dropdown
+    local dropdown
+    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+    
+    if _G["WowStyle1DropdownTemplate"] then
+        dropdown = CreateFrame("DropdownButton", nil, group, "WowStyle1DropdownTemplate")
+        dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY - 20)
         dropdown:SetWidth(CONSTANTS.DROPDOWN_WIDTH)
         
         local function SetDropdownText(text)
@@ -519,122 +460,62 @@ function SettingsBuilder:AddDropdown(group, labelText, items, currentValue, call
         end)
         
         if setting then
-            control.settingKey = setting
-            control.UpdateValue = function(self, val)
+            dropdown.settingKey = setting
+            dropdown.UpdateValue = function(self, val)
                 SetDropdownText(val)
             end
-            table.insert(self.controls, control)
+            table.insert(self.controls, dropdown)
         end
-        
-        group.currentY = group.currentY - (control:GetHeight() + self.spacing.item)
-        table.insert(group.elements, control)
-        return control
-        
     else
-        local label = group:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-        label:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY)
-        label:SetText(labelText)
+        dropdown = CreateFrame("Frame", "KnackDropdown" .. (setting or math.random(1000)), group, "UIDropDownMenuTemplate")
+        dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft - CONSTANTS.PADDING_LARGE, group.currentY - 20)
+        UIDropDownMenu_SetWidth(dropdown, CONSTANTS.DROPDOWN_WIDTH)
+        UIDropDownMenu_SetText(dropdown, currentValue)
+        dropdown:SetFrameLevel(group:GetFrameLevel() + 1)
         
-        if _G["WowStyle1DropdownTemplate"] then
-            dropdown = CreateFrame("DropdownButton", nil, group, "WowStyle1DropdownTemplate")
-            dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft, group.currentY - 20)
-            dropdown:SetWidth(CONSTANTS.DROPDOWN_WIDTH)
-            
-            local function SetDropdownText(text)
-                dropdown:SetText(text)
-            end
-            
-            SetDropdownText(currentValue)
-            
-            dropdown:SetupMenu(function(dropdown, rootDescription)
-                rootDescription:SetTag("KnackDropdown")
-                
-                local selectedValue = currentValue
-                if setting then
-                    selectedValue = GetSetting(setting)
-                end
-                
-                for _, item in ipairs(items) do
-                    local button = rootDescription:CreateButton(item, function()
-                        SetDropdownText(item)
-                        callback(item)
-                    end)
-                    
-                    button:SetIsSelected(function() return item == selectedValue end)
-                    
-                    if LSM then
-                        local fontPath = LSM:Fetch("font", item)
-                        if fontPath then
-                            button:AddInitializer(function(btn, description, menu)
-                                local fontString = btn.fontString or btn.Text or (btn.GetFontString and btn:GetFontString())
-                                if fontString then
-                                    local _, height, flags = fontString:GetFont()
-                                    fontString:SetFont(fontPath, height, flags)
-                                end
-                            end)
-                        end
-                    end
-                end
-            end)
-            
+        local function InitializeDropdown(self, level)
+            local selectedValue = currentValue
             if setting then
-                dropdown.settingKey = setting
-                dropdown.UpdateValue = function(self, val)
-                    SetDropdownText(val)
-                end
-                table.insert(self.controls, dropdown)
+                selectedValue = GetSetting(setting)
             end
-        else
-            dropdown = CreateFrame("Frame", "KnackDropdown" .. (setting or math.random(1000)), group, "UIDropDownMenuTemplate")
-            dropdown:SetPoint("TOPLEFT", group, "TOPLEFT", self.spacing.groupLeft - CONSTANTS.PADDING_LARGE, group.currentY - 20)
-            UIDropDownMenu_SetWidth(dropdown, CONSTANTS.DROPDOWN_WIDTH)
-            UIDropDownMenu_SetText(dropdown, currentValue)
-            dropdown:SetFrameLevel(group:GetFrameLevel() + 1)
-            
-            local function InitializeDropdown(self, level)
-                local selectedValue = currentValue
-                if setting then
-                    selectedValue = GetSetting(setting)
-                end
 
-                for _, item in ipairs(items) do
-                    local info = UIDropDownMenu_CreateInfo()
-                    info.text = item
-                    info.func = function()
-                        UIDropDownMenu_SetText(dropdown, item)
-                        callback(item)
-                    end
-                    info.checked = (item == selectedValue)
-                    
-                    if LSM then
-                        local fontPath = LSM:Fetch("font", item)
-                        if fontPath then
-                            info.fontObject = CreateFont("KnackDropdownFont_" .. item:gsub("[^%w]", ""))
-                            info.fontObject:SetFont(fontPath, 12, "OUTLINE")
-                        end
-                    end
-                    
-                    UIDropDownMenu_AddButton(info)
+            for _, item in ipairs(items) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = item
+                info.func = function()
+                    UIDropDownMenu_SetText(dropdown, item)
+                    callback(item)
                 end
-            end
-            
-            UIDropDownMenu_Initialize(dropdown, InitializeDropdown)
-            
-            if setting then
-                dropdown.settingKey = setting
-                dropdown.items = items
-                dropdown.InitializeDropdown = InitializeDropdown
-                table.insert(self.controls, dropdown)
+                info.checked = (item == selectedValue)
+                
+                if LSM then
+                    local fontPath = LSM:Fetch("font", item)
+                    if fontPath then
+                        info.fontObject = CreateFont("KnackDropdownFont_" .. item:gsub("[^%w]", ""))
+                        info.fontObject:SetFont(fontPath, 12, "OUTLINE")
+                    end
+                end
+                
+                UIDropDownMenu_AddButton(info)
             end
         end
         
-        dropdown.label = label
+        UIDropDownMenu_Initialize(dropdown, InitializeDropdown)
         
-        group.currentY = group.currentY - CONSTANTS.DROPDOWN_HEIGHT
-        table.insert(group.elements, label)
-        table.insert(group.elements, dropdown)
-        return dropdown
+        if setting then
+            dropdown.settingKey = setting
+            dropdown.items = items
+            dropdown.InitializeDropdown = InitializeDropdown
+            table.insert(self.controls, dropdown)
+        end
     end
+    
+    dropdown.label = label
+    
+    group.currentY = group.currentY - CONSTANTS.DROPDOWN_HEIGHT
+    table.insert(group.elements, label)
+    table.insert(group.elements, dropdown)
+    return dropdown
 end
 
 function SettingsBuilder:AddColorPicker(group, label, setting, callback, relativeTo)
@@ -714,121 +595,129 @@ function SettingsBuilder:AddColorPicker(group, label, setting, callback, relativ
     return button
 end
 
-function SettingsBuilder:BeginCollapsibleSubGroup(parentGroup, title, reflowCallback)
-    local container = CreateFrame("Frame", nil, parentGroup, "BackdropTemplate")
+function SettingsBuilder:BeginSubGroup(parentGroup)
+    local group = CreateFrame("Frame", nil, parentGroup, "BackdropTemplate")
     local width = 580 - (self.spacing.groupLeft * 2)
-    container:SetWidth(width)
+    group:SetWidth(width)
     
-    -- Header Button
-    local header = CreateFrame("Button", nil, container)
-    header:SetPoint("TOPLEFT", 0, 0)
-    header:SetPoint("TOPRIGHT", 0, 0)
-    header:SetHeight(24)
+    group:SetPoint("TOPLEFT", parentGroup, "TOPLEFT", self.spacing.groupLeft, parentGroup.currentY)
     
-    -- Twistie Texture
-    header.arrow = header:CreateTexture(nil, "ARTWORK")
-    header.arrow:SetPoint("LEFT", 4, 0)
-    header.arrow:SetSize(14, 14)
+    group.elements = {}
+    group.currentY = -self.spacing.groupTop
     
-    if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("Options-List-Expand") then
-        header.arrow:SetAtlas("Options-List-Expand")
-        header.collapsedAtlas = "Options-List-Expand"
-        header.expandedAtlas = "Options-List-Collapse"
-    else
-        header.arrow:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
-        header.collapsedTexture = "Interface\\Buttons\\UI-PlusButton-Up"
-        header.expandedTexture = "Interface\\Buttons\\UI-MinusButton-Up"
-    end
+    -- Initialize expansion state for profiles
+    group.expanded = { ["Main Icon"] = true, ["Nameplate Icon"] = true }
+
+    -- Twistie
+    local twistie = CreateFrame("Button", nil, group)
+    twistie:SetSize(16, 16)
+    twistie:SetPoint("TOPLEFT", 6, -6)
+    twistie:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up") -- Expanded by default
     
-    -- Title
-    header.text = header:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    header.text:SetPoint("LEFT", header.arrow, "RIGHT", 4, 0)
-    header.text:SetText(title)
+    group.twistie = twistie
     
-    -- Content Frame
-    local content = CreateFrame("Frame", nil, container, "BackdropTemplate")
-    content:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, 0)
-    content:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", 0, 0)
-    content.elements = {}
-    content.currentY = -self.spacing.groupTop
+    -- Store builder reference on group
+    group.builder = self
     
-    -- State
-    container.expandedStates = {}
-    
-    container.IsExpanded = function(self)
-        return self.expandedStates[currentProfile] == true
-    end
-    
-    container.SetExpanded = function(self, expanded)
-        self.expandedStates[currentProfile] = expanded
-    end
-    
-    content:Hide()
-    
-    container.RefreshState = function(self)
-        local expanded = self:IsExpanded()
-        if expanded then
-            content:Show()
-            if header.expandedAtlas then
-                header.arrow:SetAtlas(header.expandedAtlas)
-            else
-                header.arrow:SetTexture(header.expandedTexture)
+    function group:UpdateExpansionVisuals()
+        local profile = self.builder.currentProfile or "Main Icon"
+        local isExpanded = self.expanded[profile]
+        
+        if isExpanded then
+            self.twistie:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up")
+            for _, elem in ipairs(self.elements) do 
+                if elem.isHeader then
+                    elem:Show()
+                elseif elem.knackProfile then
+                    if elem.knackProfile == profile then
+                        elem:Show()
+                    else
+                        elem:Hide()
+                    end
+                else
+                    elem:Show()
+                end
             end
         else
-            content:Hide()
-            if header.collapsedAtlas then
-                header.arrow:SetAtlas(header.collapsedAtlas)
-            else
-                header.arrow:SetTexture(header.collapsedTexture)
+            self.twistie:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
+            for _, elem in ipairs(self.elements) do 
+                if not elem.isHeader then elem:Hide() end 
             end
         end
-        if self.UpdateHeight then self:UpdateHeight() end
     end
     
-    header:SetScript("OnClick", function()
-        local newState = not container:IsExpanded()
-        container:SetExpanded(newState)
-        container:RefreshState()
+    twistie:SetScript("OnClick", function()
+        local profile = self.currentProfile or "Main Icon"
+        group.expanded[profile] = not group.expanded[profile]
         
-        -- Trigger Reflow
-        if reflowCallback then reflowCallback() end
+        group:UpdateExpansionVisuals()
+        if self.Reflow then self:Reflow() end
     end)
     
-    container.header = header
-    container.content = content
-    
-    -- We return content so items are added to it, but we attach container ref to it
-    content.container = container
-    
-    return content
+    table.insert(self.groups, group)
+
+    return group
 end
 
-function SettingsBuilder:EndCollapsibleSubGroup(content)
-    local container = content.container
-    local totalHeight = math.abs(content.currentY) + self.spacing.groupBottom
-    content:SetHeight(totalHeight)
-    content.originalHeight = totalHeight
+function SettingsBuilder:EndSubGroup(group, parentGroup)
+    local totalHeight = math.abs(group.currentY) + self.spacing.groupBottom
+    group.fullHeight = totalHeight
+    group:SetHeight(totalHeight)
     
-    content:SetBackdrop({
+    group:SetBackdrop({
         bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    content:SetBackdropColor(0.15, 0.15, 0.15, 0.5)
-    content:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
+    group:SetBackdropColor(0.15, 0.15, 0.15, 0.5)
+    group:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
     
-    container.UpdateHeight = function(self)
-        if self:IsExpanded() then
-            self:SetHeight(self.header:GetHeight() + self.content:GetHeight())
-        else
-            self:SetHeight(self.header:GetHeight())
-        end
+    parentGroup.currentY = parentGroup.currentY - (totalHeight + self.spacing.item)
+    table.insert(parentGroup.elements, group)
+    return group
+end
+
+-- Profile Management
+local currentProfile = "Main Icon"
+local profiles = {
+    { name = "Main Icon", prefix = "" },
+    { name = "Nameplate Icon", prefix = "nameplate" }
+}
+
+local globalKeys = {
+    ["enabled"] = true,
+    ["onlyWithEnemyTarget"] = true,
+    ["attachToNameplate"] = true
+}
+
+local function GetSettingKey(baseKey)
+    if globalKeys[baseKey] then return baseKey end
+
+    local profile = nil
+    for _, p in ipairs(profiles) do
+        if p.name == currentProfile then profile = p break end
     end
     
-    container:UpdateHeight()
+    if not profile then return baseKey end
     
-    return container
+    if profile.prefix == "" then
+        -- Lowercase first letter for main profile (e.g. "IconSize" -> "iconSize")
+        return baseKey:gsub("^%u", string.lower)
+    else
+        -- Prefix + Uppercase first letter (e.g. "IconSize" -> "nameplateIconSize")
+        return profile.prefix .. baseKey:gsub("^%l", string.upper)
+    end
+end
+
+local function GetSetting(baseKey)
+    local key = GetSettingKey(baseKey)
+    return KnackDB.settings[key]
+end
+
+local function SetSetting(baseKey, value)
+    local key = GetSettingKey(baseKey)
+    KnackDB.settings[key] = value
 end
 
 local function UpdatePanelValues(builder)
@@ -836,33 +725,52 @@ local function UpdatePanelValues(builder)
         local key = GetSettingKey(control.settingKey)
         local value = KnackDB.settings[key]
         
-        if control.UpdateValue then -- Modern Dropdown or Custom Control
-            control:UpdateValue(value)
-        elseif control.SetChecked then -- Checkbox (Modern wrapper or Old)
+        if control:GetObjectType() == "CheckButton" then
             control:SetChecked(value)
+            
         elseif control.IsModernSlider then
             control:SetValue(value or 0)
             if control.Label then control.Label:SetText(control.labelFormat(value or 0)) end
+            
         elseif control:GetObjectType() == "Slider" then
             control:SetValue(value or 0)
             _G[control.name .. "Text"]:SetText(control.labelFormat(value or 0))
+            
         elseif control:GetObjectType() == "Button" and control.swatch then -- ColorPicker
             local r, g, b, a = unpack(value or {1, 1, 1, 1})
             control.swatch:SetColorTexture(r, g, b, a)
-        elseif control:GetObjectType() == "Frame" and control.InitializeDropdown then -- Old Dropdown
+            
+        elseif control.UpdateValue then -- Modern Dropdown
+            control:UpdateValue(value)
+            
+        elseif control:GetObjectType() == "Frame" and control.InitializeDropdown then -- Dropdown
             UIDropDownMenu_SetText(control, value)
+            -- No need to re-initialize, the existing initialization function is dynamic now!
         end
     end
     
-    -- Handle visibility of profile-specific controls
+    -- Handle visibility of profile-specific controls that are NOT in collapsible groups
     if builder.profileSpecificControls then
         for profileName, controls in pairs(builder.profileSpecificControls) do
             for _, control in ipairs(controls) do
-                if profileName == currentProfile then
-                    control:Show()
-                else
-                    control:Hide()
+                -- If the parent is not a collapsible group (checked by presence of 'UpdateExpansionVisuals')
+                local parent = control:GetParent()
+                if not parent or not parent.UpdateExpansionVisuals then
+                    if profileName == (builder.currentProfile or "Main Icon") then
+                        control:Show()
+                    else
+                        control:Hide()
+                    end
                 end
+            end
+        end
+    end
+    
+    -- Update group visibility and expansion state
+    if builder.groups then
+        for _, group in ipairs(builder.groups) do
+            if group.UpdateExpansionVisuals then
+                group:UpdateExpansionVisuals()
             end
         end
     end
@@ -871,11 +779,9 @@ end
 -- Create the settings panel
 local function CreateSettingsPanel()
     local builder = SettingsBuilder:New("knack", UIParent)
+    builder.currentProfile = currentProfile
     builder:AddTitle("knack - Next Assisted Combat", "Configure the next assisted combat spell icon display")
     builder.profileSpecificControls = { ["Main Icon"] = {}, ["Nameplate Icon"] = {} }
-    
-    -- Forward declaration for reflow function
-    local ReflowConfigGroup
     
     -- GROUP 1: General Settings (Global)
     local globalGroup = builder:BeginGroup()
@@ -897,8 +803,9 @@ local function CreateSettingsPanel()
     
     builder:AddTabs(tabsGroup, availableProfiles, currentProfile, function(val)
         currentProfile = val
+        builder.currentProfile = val
         UpdatePanelValues(builder)
-        if ReflowConfigGroup then ReflowConfigGroup() end
+        if builder.Reflow then builder:Reflow() end
     end)
     builder:EndGroup(tabsGroup)
     tabsGroup:SetBackdrop(nil) -- Make tabs group transparent
@@ -934,10 +841,11 @@ local function CreateSettingsPanel()
     local initialRowY = configGroup.currentY
 
     -- Row 1: Size & Position
-    local sizeContent = builder:BeginCollapsibleSubGroup(configGroup, "Size & Position", function() if ReflowConfigGroup then ReflowConfigGroup() end end)
+    local sizeRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(sizeRow, "Size & Position")
     
     -- Generic Size Slider
-    builder:AddSlider(sizeContent, "KnackGenericIconSizeSlider", CONSTANTS.SLIDER.ICON_MIN, CONSTANTS.SLIDER.ICON_MAX, 64, 
+    builder:AddSlider(sizeRow, "KnackGenericIconSizeSlider", CONSTANTS.SLIDER.ICON_MIN, CONSTANTS.SLIDER.ICON_MAX, 64, 
         tostring(CONSTANTS.SLIDER.ICON_MIN), tostring(CONSTANTS.SLIDER.ICON_MAX),
         function(v) return "Icon Size: " .. v end,
         function(v)
@@ -946,37 +854,37 @@ local function CreateSettingsPanel()
             if currentProfile ~= "Main Icon" then KnackUpdateNameplateAttachment() end
         end, nil, 0, nil, "IconSize")
 
-    local startY = sizeContent.currentY
+    local startY = sizeRow.currentY
     
     -- Main Profile Controls
-    local mainResetBtn = builder:AddButton(sizeContent, "Reset Position", 150, function()
+    local mainResetBtn = builder:AddButton(sizeRow, "Reset Position", 150, function()
         KnackResetPosition()
         print("|cff00ff00[knack]|r position reset to center.")
     end)
     table.insert(builder.profileSpecificControls["Main Icon"], mainResetBtn)
     
-    local mainText1 = builder:AddText(sizeContent, "Hold SHIFT and use the scrollwheel to resize the spell icon", CONSTANTS.GRAY_TEXT)
+    local mainText1 = builder:AddText(sizeRow, "Hold SHIFT and use the scrollwheel to resize the spell icon", CONSTANTS.GRAY_TEXT)
     table.insert(builder.profileSpecificControls["Main Icon"], mainText1)
     
-    local mainText2 = builder:AddText(sizeContent, "Hold SHIFT and drag the spell icon to reposition it.", CONSTANTS.GRAY_TEXT)
+    local mainText2 = builder:AddText(sizeRow, "Hold SHIFT and drag the spell icon to reposition it.", CONSTANTS.GRAY_TEXT)
     table.insert(builder.profileSpecificControls["Main Icon"], mainText2)
     
-    local mainY = sizeContent.currentY
+    local mainY = sizeRow.currentY
     
     -- Nameplate Profile Controls
-    sizeContent.currentY = startY -- Reset Y for overlap
+    sizeRow.currentY = startY -- Reset Y for overlap
     
     local anchorPoints = {"TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT"}
-    local npAnchorDropdown = builder:AddDropdown(sizeContent, "Anchor Point:", anchorPoints, KnackDB.settings.nameplateAnchor or "TOP", function(val)
+    local npAnchorDropdown = builder:AddDropdown(sizeRow, "Anchor Point:", anchorPoints, KnackDB.settings.nameplateAnchor or "TOP", function(val)
         KnackDB.settings.nameplateAnchor = val
         if KnackUpdateNameplateAttachment then KnackUpdateNameplateAttachment() end
     end)
     table.insert(builder.profileSpecificControls["Nameplate Icon"], npAnchorDropdown)
     table.insert(builder.profileSpecificControls["Nameplate Icon"], npAnchorDropdown.label)
 
-    local rowY = sizeContent.currentY
+    local rowY = sizeRow.currentY
 
-    local npOffsetSlider = builder:AddSlider(sizeContent, "KnackNameplateOffsetSlider", 0, 13, KnackDB.settings.nameplateOffset or 1, 
+    local npOffsetSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetSlider", 0, 13, KnackDB.settings.nameplateOffset or 1, 
         "0", "13",
         function(v) return "Anchor Distance: " .. v end,
         function(v) 
@@ -987,8 +895,8 @@ local function CreateSettingsPanel()
     table.insert(builder.profileSpecificControls["Nameplate Icon"], npOffsetSlider)
 
     -- X Offset Slider
-    local npOffsetXSlider = builder:AddSlider(sizeContent, "KnackNameplateOffsetXSlider", -100, 100, KnackDB.settings.nameplateOffsetX or 0, 
-        "-100%", "100%",
+    local npOffsetXSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetXSlider", -50, 50, KnackDB.settings.nameplateOffsetX or 0, 
+        "-50%", "50%",
         function(v) return "X Offset: " .. v .. "%" end,
         function(v) 
             KnackDB.settings.nameplateOffsetX = v 
@@ -998,8 +906,8 @@ local function CreateSettingsPanel()
     table.insert(builder.profileSpecificControls["Nameplate Icon"], npOffsetXSlider)
     
     -- Y Offset Slider
-    local npOffsetYSlider = builder:AddSlider(sizeContent, "KnackNameplateOffsetYSlider", -100, 100, KnackDB.settings.nameplateOffsetY or 0, 
-        "-100%", "100%",
+    local npOffsetYSlider = builder:AddSlider(sizeRow, "KnackNameplateOffsetYSlider", -50, 50, KnackDB.settings.nameplateOffsetY or 0, 
+        "-50%", "50%",
         function(v) return "Y Offset: " .. v .. "%" end,
         function(v) 
             KnackDB.settings.nameplateOffsetY = v 
@@ -1008,30 +916,32 @@ local function CreateSettingsPanel()
         nil, 220, startY - 80)
     table.insert(builder.profileSpecificControls["Nameplate Icon"], npOffsetYSlider)
     
-    sizeContent.currentY = startY - 80 - CONSTANTS.SLIDER.HEIGHT - CONSTANTS.PADDING_SMALL
+    sizeRow.currentY = startY - 80 - CONSTANTS.SLIDER.HEIGHT - CONSTANTS.PADDING_SMALL
 
-    local npY = sizeContent.currentY
+    local npY = sizeRow.currentY
     
     -- Store heights for dynamic resizing
-    sizeContent.profileHeights = {
+    sizeRow.profileHeights = {
         ["Main Icon"] = math.abs(mainY) + builder.spacing.groupBottom,
         ["Nameplate Icon"] = math.abs(npY) + builder.spacing.groupBottom
     }
     
     -- Set initial height based on current profile
-    sizeContent.currentY = -(sizeContent.profileHeights[currentProfile] - builder.spacing.groupBottom)
+    sizeRow.currentY = -(sizeRow.profileHeights[currentProfile] - builder.spacing.groupBottom)
         
-    local sizeContainer = builder:EndCollapsibleSubGroup(sizeContent)
-    table.insert(configGroup.rows, sizeContainer)
+    builder:EndSubGroup(sizeRow, configGroup)
+    table.insert(configGroup.rows, sizeRow)
         
     -- Row 2: Border Settings
-    local borderContent = builder:BeginCollapsibleSubGroup(configGroup, "Border Settings", function() if ReflowConfigGroup then ReflowConfigGroup() end end)
+    local borderRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(borderRow, "Border Settings")
     
-    builder:AddCheckbox(borderContent, "Show Border", "Show a border around the icon", "ShowBorder", function(self)
+    builder:AddCheckbox(borderRow, "Show Border", "Show a border around the icon", "ShowBorder", function(self)
         SetSetting("ShowBorder", self:GetChecked())
         if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
     end, 0)
     
+    local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     local borderList = {}
     if LSM then
         for _, borderName in pairs(LSM:List("border")) do
@@ -1042,19 +952,79 @@ local function CreateSettingsPanel()
         borderList = {"Blizzard Tooltip", "Blizzard Dialog"}
     end
     
-    local borderDropdown = builder:AddDropdown(borderContent, "Border Texture:", borderList, "Blizzard Tooltip", function(val)
+    local borderDropdown = builder:AddDropdown(borderRow, "Border Texture:", borderList, "Blizzard Tooltip", function(val)
         SetSetting("BorderTexture", val)
         if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
     end, "BorderTexture")
     
     -- Color Picker
-    builder:AddColorPicker(borderContent, "Border Color", "BorderColor", function(r, g, b, a)
-        if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
-    end, borderDropdown)
+    local cpButton = CreateFrame("Button", nil, borderRow)
+    cpButton:SetSize(20, 20)
+    cpButton:SetPoint("LEFT", borderDropdown, "RIGHT", 10, 2)
     
-    local rowY = borderContent.currentY
+    cpButton.swatch = cpButton:CreateTexture(nil, "OVERLAY")
+    cpButton.swatch:SetAllPoints(cpButton)
+    cpButton.swatch:SetColorTexture(1, 1, 1, 1)
     
-    builder:AddSlider(borderContent, "KnackGenericBorderWidthSlider", 1, 64, 16, 
+    cpButton.border = cpButton:CreateTexture(nil, "BACKGROUND")
+    cpButton.border:SetPoint("TOPLEFT", cpButton, "TOPLEFT", -1, 1)
+    cpButton.border:SetPoint("BOTTOMRIGHT", cpButton, "BOTTOMRIGHT", 1, -1)
+    cpButton.border:SetColorTexture(0.5, 0.5, 0.5)
+    
+    cpButton:SetScript("OnClick", function()
+        local settingKey = GetSettingKey("BorderColor")
+        local r, g, b, a = unpack(KnackDB.settings[settingKey] or {1, 1, 1, 1})
+        
+        local function OnColorSelect()
+            local newR, newG, newB = ColorPickerFrame:GetColorRGB()
+            local newA = a
+            if ColorPickerFrame.GetColorAlpha then
+                newA = ColorPickerFrame:GetColorAlpha()
+            elseif OpacitySliderFrame then
+                newA = OpacitySliderFrame:GetValue()
+            end
+            
+            KnackDB.settings[settingKey] = {newR, newG, newB, newA}
+            cpButton.swatch:SetColorTexture(newR, newG, newB, newA)
+            if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+        end
+        
+        local function OnCancel()
+            KnackDB.settings[settingKey] = {r, g, b, a}
+            cpButton.swatch:SetColorTexture(r, g, b, a)
+            if currentProfile == "Main Icon" then KnackUpdateBorder() else KnackUpdateNameplateBorder() end
+        end
+        
+        if ColorPickerFrame.SetupColorPickerAndShow then
+            local info = {
+                swatchFunc = OnColorSelect,
+                opacityFunc = OnColorSelect,
+                cancelFunc = OnCancel,
+                hasOpacity = true,
+                opacity = a,
+                r = r,
+                g = g,
+                b = b,
+            }
+            ColorPickerFrame:SetupColorPickerAndShow(info)
+        else
+            ColorPickerFrame.func = OnColorSelect
+            ColorPickerFrame.opacityFunc = OnColorSelect
+            ColorPickerFrame.cancelFunc = OnCancel
+            ColorPickerFrame:SetColorRGB(r, g, b)
+            ColorPickerFrame.hasOpacity = true
+            ColorPickerFrame.opacity = a
+            ColorPickerFrame:Show()
+        end
+    end)
+    
+    cpButton.settingKey = "BorderColor"
+    table.insert(builder.controls, cpButton)
+    table.insert(borderRow.elements, cpButton)
+    
+    local rowY = borderRow.currentY
+    
+    builder:AddSlider(borderRow, "KnackGenericBorderWidthSlider", 1, 64, 16, 
         "1", "64",
         function(v) return "Border Thickness: " .. v end,
         function(v) 
@@ -1063,7 +1033,7 @@ local function CreateSettingsPanel()
         end,
         nil, 0, rowY - CONSTANTS.PADDING_LARGE, "BorderWidth")
         
-    builder:AddSlider(borderContent, "KnackGenericBorderOffsetSlider", -20, 20, 2, 
+    builder:AddSlider(borderRow, "KnackGenericBorderOffsetSlider", -20, 20, 2, 
         "-20", "20",
         function(v) return "Border Offset: " .. v end,
         function(v) 
@@ -1072,12 +1042,13 @@ local function CreateSettingsPanel()
         end,
         nil, 220, rowY - CONSTANTS.PADDING_LARGE, "BorderOffset")
         
-    borderContent.currentY = rowY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item)
-    local borderContainer = builder:EndCollapsibleSubGroup(borderContent)
-    table.insert(configGroup.rows, borderContainer)
+    borderRow.currentY = rowY - (CONSTANTS.SLIDER.HEIGHT + builder.spacing.item)
+    builder:EndSubGroup(borderRow, configGroup)
+    table.insert(configGroup.rows, borderRow)
     
     -- Row 3: Hotkey Settings
-    local hotkeyContent = builder:BeginCollapsibleSubGroup(configGroup, "Hotkey Settings", function() if ReflowConfigGroup then ReflowConfigGroup() end end)
+    local hotkeyRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(hotkeyRow, "Hotkey Settings")
     
     local fontList = {}
     if LSM then
@@ -1089,93 +1060,115 @@ local function CreateSettingsPanel()
         fontList = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
     end
     
-    builder:AddDropdown(hotkeyContent, "Hotkey Font:", fontList, "Friz Quadrata TT", function(fontName)
+    local anchorPositions = {"TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT"}
+    builder:AddDropdown(hotkeyRow, "Hotkey Position:", anchorPositions, "TOPRIGHT", function(anchor)
+        SetSetting("HotkeyAnchor", anchor)
+        if KnackUpdateHotkeyPosition then KnackUpdateHotkeyPosition() end
+    end, "HotkeyAnchor")
+    
+    builder:AddDropdown(hotkeyRow, "Hotkey Font:", fontList, "Friz Quadrata TT", function(fontName)
         SetSetting("HotkeyFont", fontName)
         KnackUpdateHotkeyFont()
     end, "HotkeyFont")
     
-    builder:AddSlider(hotkeyContent, "KnackGenericHotkeySizeSlider", CONSTANTS.SLIDER.HOTKEY_MIN, CONSTANTS.SLIDER.HOTKEY_MAX, 10, 
+    builder:AddSlider(hotkeyRow, "KnackGenericHotkeySizeSlider", CONSTANTS.SLIDER.HOTKEY_MIN, CONSTANTS.SLIDER.HOTKEY_MAX, 10, 
         tostring(CONSTANTS.SLIDER.HOTKEY_MIN), tostring(CONSTANTS.SLIDER.HOTKEY_MAX),
         function(v) return "Hotkey Font Size: " .. v end,
         function(v) SetSetting("HotkeySize", v) KnackUpdateHotkeySize() end, nil, nil, nil, "HotkeySize")
-    local hotkeyContainer = builder:EndCollapsibleSubGroup(hotkeyContent)
-    table.insert(configGroup.rows, hotkeyContainer)
+    builder:EndSubGroup(hotkeyRow, configGroup)
+    table.insert(configGroup.rows, hotkeyRow)
     
     -- Row 4: Tooltip Settings
-    local tooltipContent = builder:BeginCollapsibleSubGroup(configGroup, "Tooltip Settings", function() if ReflowConfigGroup then ReflowConfigGroup() end end)
+    local tooltipRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(tooltipRow, "Tooltip Settings")
     
-    builder:AddCheckbox(tooltipContent, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "ShowTooltip", function(self)
+    builder:AddCheckbox(tooltipRow, "Show spell tooltip on mouseover", "Display the spell tooltip when hovering over the icon", "ShowTooltip", function(self)
         SetSetting("ShowTooltip", self:GetChecked())
         UpdatePanelValues(builder)
     end, 0)
     
-    builder:AddCheckbox(tooltipContent, "Hide tooltip in combat", "Only show tooltip when out of combat", "HideTooltipInCombat", function(self)
+    builder:AddCheckbox(tooltipRow, "Hide tooltip in combat", "Only show tooltip when out of combat", "HideTooltipInCombat", function(self)
         SetSetting("HideTooltipInCombat", self:GetChecked())
     end, 20)
-    local tooltipContainer = builder:EndCollapsibleSubGroup(tooltipContent)
-    table.insert(configGroup.rows, tooltipContainer)
+    builder:EndSubGroup(tooltipRow, configGroup)
+    table.insert(configGroup.rows, tooltipRow)
     
     -- Row 5: Timers & Overlays
-    local timersContent = builder:BeginCollapsibleSubGroup(configGroup, "Timers & Overlays", function() if ReflowConfigGroup then ReflowConfigGroup() end end)
+    local timersRow = builder:BeginSubGroup(configGroup)
+    builder:AddHeader(timersRow, "Timers & Overlays")
     
-    builder:AddCheckbox(timersContent, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "ShowGCD", function(self)
+    builder:AddCheckbox(timersRow, "Show Global Cooldown overlay", "Display a darkening overlay on the icon during global cooldown", "ShowGCD", function(self)
         SetSetting("ShowGCD", self:GetChecked())
         KnackUpdateGCDOverlay()
     end, 0)
     
-    builder:AddSlider(timersContent, "KnackGenericGCDOpacitySlider", CONSTANTS.SLIDER.GCD_MIN, CONSTANTS.SLIDER.GCD_MAX, 0.7, 
+    builder:AddSlider(timersRow, "KnackGenericGCDOpacitySlider", CONSTANTS.SLIDER.GCD_MIN, CONSTANTS.SLIDER.GCD_MAX, 0.7, 
         tostring(CONSTANTS.SLIDER.GCD_MIN) .. "%", tostring(CONSTANTS.SLIDER.GCD_MAX * 100) .. "%",
         function(v) return "GCD Overlay Opacity: " .. math.floor(v * 100) .. "%" end,
         function(v) SetSetting("GCDOpacity", v) KnackUpdateGCDOverlay() end,
         CONSTANTS.SLIDER.GCD_STEP, nil, nil, "GCDOpacity")
 
-    builder:AddCheckbox(timersContent, "Show Cast Timer sweep", "Display a sweep animation on the icon during spell casting", "ShowCastSweep", function(self)
+    builder:AddCheckbox(timersRow, "Show Cast Timer sweep", "Display a sweep animation on the icon during spell casting", "ShowCastSweep", function(self)
         SetSetting("ShowCastSweep", self:GetChecked())
         UpdatePanelValues(builder)
     end, 0)
 
-    builder:AddCheckbox(timersContent, "Show Cast Glow", "Display the inner glow effect during cast sweep", "ShowCastGlow", function(self)
+    builder:AddCheckbox(timersRow, "Show Cast Glow", "Display the inner glow effect during cast sweep", "ShowCastGlow", function(self)
         SetSetting("ShowCastGlow", self:GetChecked())
     end, 20)
     
-    builder:AddCheckbox(timersContent, "Show Channel Timer sweep", "Display a sweep animation on the icon during spell channeling", "ShowChannelSweep", function(self)
+    builder:AddCheckbox(timersRow, "Show Channel Timer sweep", "Display a sweep animation on the icon during spell channeling", "ShowChannelSweep", function(self)
         SetSetting("ShowChannelSweep", self:GetChecked())
         UpdatePanelValues(builder)
     end, 0)
 
-    builder:AddCheckbox(timersContent, "Show Channel Glow", "Display the inner glow effect during channel sweep", "ShowChannelGlow", function(self)
+    builder:AddCheckbox(timersRow, "Show Channel Glow", "Display the inner glow effect during channel sweep", "ShowChannelGlow", function(self)
         SetSetting("ShowChannelGlow", self:GetChecked())
     end, 20)
 
-    local timersContainer = builder:EndCollapsibleSubGroup(timersContent)
-    table.insert(configGroup.rows, timersContainer)
+    builder:EndSubGroup(timersRow, configGroup)
+    table.insert(configGroup.rows, timersRow)
     
     builder:EndScrollingGroup(configGroup)
     
     -- Define Reflow function
-    ReflowConfigGroup = function()
+    builder.Reflow = function()
         local currentY = initialRowY
-        
-        -- Handle Size Row special case
-        if sizeContent and sizeContainer then
-             local h = sizeContent.profileHeights[currentProfile] or sizeContent.originalHeight
-             sizeContent:SetHeight(h)
-             -- sizeContainer:UpdateHeight() -- RefreshState will handle this
-        end
+        local profile = builder.currentProfile or "Main Icon"
         
         for _, row in ipairs(configGroup.rows) do
-            if row.RefreshState then row:RefreshState() end
+            local h
+            if row.expanded[profile] then
+                if row == sizeRow then
+                    h = row.profileHeights[profile] or row.fullHeight
+                else
+                    h = row.fullHeight
+                end
+            else
+                h = 30 -- Collapsed height
+            end
+            row:SetHeight(h)
+            
             row:SetPoint("TOPLEFT", configGroup, "TOPLEFT", builder.spacing.groupLeft, currentY)
-            currentY = currentY - row:GetHeight() - builder.spacing.item
+            currentY = currentY - h - builder.spacing.item
         end
         
         local totalHeight = math.abs(currentY) + builder.spacing.groupBottom
         configGroup:SetHeight(totalHeight)
     end
     
+    -- Tag profile specific controls
+    if builder.profileSpecificControls then
+        for profileName, controls in pairs(builder.profileSpecificControls) do
+            for _, control in ipairs(controls) do
+                control.knackProfile = profileName
+            end
+        end
+    end
+    
     -- Initial Update
     UpdatePanelValues(builder)
-    ReflowConfigGroup()
+    builder:Reflow()
     
     return builder.panel
 end
