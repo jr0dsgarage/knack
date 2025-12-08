@@ -6,5 +6,8 @@
 ## SavedVariables: KnackDB
 ## OptionalDeps: LibSharedMedia-3.0, next
 
+Constants.lua
+Utils.lua
 Settings.lua
+Display.lua
 knack.lua
