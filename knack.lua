@@ -660,17 +660,13 @@ function Knack:UpdateCooldownManagerIcons(frame, managerName)
     -- Default to enabled if settings not yet initialized (shouldn't happen but safe fallback)
     if KnackDB and not KnackDB.settings then enabled = true end
 
-    -- print("[Knack] Updating icons for frame:", frame:GetName())
     local children = { frame:GetChildren() }
-    -- print("[Knack] Found " .. #children .. " children")
 
     for i, child in ipairs(children) do
         local spellID = child.spellID
         if not spellID and child.GetSpellID then
             spellID = child:GetSpellID()
         end
-
-        -- print("[Knack] Child " .. i .. " SpellID: " .. tostring(spellID))
 
         if spellID then
             if not child.hotkeyText then
@@ -682,7 +678,6 @@ function Knack:UpdateCooldownManagerIcons(frame, managerName)
             
             if enabled then
                 local hotkey = BindingUtils.GetHotkeyInfo(spellID)
-                -- print("[Knack] Hotkey for " .. spellID .. ": " .. tostring(hotkey))
                 child.hotkeyText:SetText(hotkey)
                 
                 local fontPath = BindingUtils.GetFontPath(fontName)
@@ -718,26 +713,19 @@ function Knack:SetupCooldownManagers()
     for _, name in ipairs(managers) do
         local frame = _G[name]
         if frame then
-            print("[Knack] Found manager frame: " .. name)
             if frame.Update then
                 hooksecurefunc(frame, "Update", function(self)
-                    -- print("[Knack] Hooked Update for " .. name)
                     Knack:UpdateCooldownManagerIcons(self, name)
                 end)
-            else
-                print("[Knack] No Update method for " .. name)
             end
             
             if frame.HookScript then
                 frame:HookScript("OnShow", function(self)
-                    -- print("[Knack] Hooked OnShow for " .. name)
                     Knack:UpdateCooldownManagerIcons(self, name)
                 end)
             end
             
             Knack:UpdateCooldownManagerIcons(frame, name)
-        else
-            -- print("[Knack] Could not find manager frame: " .. name)
         end
     end
 end
