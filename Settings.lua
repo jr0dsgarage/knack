@@ -65,6 +65,17 @@ KnackDefaultSettings = {
     nameplateShowChannelSweep = true,
     nameplateShowChannelGlow = true,
     
+    -- Cooldown Manager Defaults
+    cooldownEnableEssential = true,
+    cooldownEssentialFont = "Friz Quadrata TT",
+    cooldownEssentialFontSize = 14,
+    cooldownEssentialHotkeyAnchor = "TOPRIGHT",
+    
+    cooldownEnableUtility = true,
+    cooldownUtilityFont = "Friz Quadrata TT",
+    cooldownUtilityFontSize = 14,
+    cooldownUtilityHotkeyAnchor = "TOPRIGHT",
+
     hotkeySize = 14, 
     hotkeyFont = "Friz Quadrata TT", 
     hotkeyAnchor = "TOPRIGHT",
@@ -87,16 +98,25 @@ function KnackInitializeSettings()
 end
 
 -- Profile Management
-local currentProfile = "Main Display"
+local currentProfile = "Main Icon"
 local profiles = {
-    { name = "Main Display", prefix = "" },
-    { name = "Nameplate Display", prefix = "nameplate" }
+    { name = "Main Icon", prefix = "" },
+    { name = "Nameplate Icon", prefix = "nameplate" },
+    { name = "Cooldown Icons", prefix = "cooldown" }
 }
 
 local globalKeys = {
     ["enabled"] = true,
     ["onlyWithEnemyTarget"] = true,
-    ["attachToNameplate"] = true
+    ["attachToNameplate"] = true,
+    ["cooldownEnableEssential"] = true,
+    ["cooldownEssentialFont"] = true,
+    ["cooldownEssentialFontSize"] = true,
+    ["cooldownEssentialHotkeyAnchor"] = true,
+    ["cooldownEnableUtility"] = true,
+    ["cooldownUtilityFont"] = true,
+    ["cooldownUtilityFontSize"] = true,
+    ["cooldownUtilityHotkeyAnchor"] = true
 }
 
 local function GetSettingKey(baseKey)
@@ -678,48 +698,6 @@ function SettingsBuilder:EndSubGroup(group, parentGroup)
     return group
 end
 
--- Profile Management
-local currentProfile = "Main Icon"
-local profiles = {
-    { name = "Main Icon", prefix = "" },
-    { name = "Nameplate Icon", prefix = "nameplate" }
-}
-
-local globalKeys = {
-    ["enabled"] = true,
-    ["onlyWithEnemyTarget"] = true,
-    ["attachToNameplate"] = true
-}
-
-local function GetSettingKey(baseKey)
-    if globalKeys[baseKey] then return baseKey end
-
-    local profile = nil
-    for _, p in ipairs(profiles) do
-        if p.name == currentProfile then profile = p break end
-    end
-    
-    if not profile then return baseKey end
-    
-    if profile.prefix == "" then
-        -- Lowercase first letter for main profile (e.g. "IconSize" -> "iconSize")
-        return baseKey:gsub("^%u", string.lower)
-    else
-        -- Prefix + Uppercase first letter (e.g. "IconSize" -> "nameplateIconSize")
-        return profile.prefix .. baseKey:gsub("^%l", string.upper)
-    end
-end
-
-local function GetSetting(baseKey)
-    local key = GetSettingKey(baseKey)
-    return KnackDB.settings[key]
-end
-
-local function SetSetting(baseKey, value)
-    local key = GetSettingKey(baseKey)
-    KnackDB.settings[key] = value
-end
-
 local function UpdatePanelValues(builder)
     for _, control in ipairs(builder.controls) do
         local key = GetSettingKey(control.settingKey)
@@ -772,6 +750,9 @@ local function UpdatePanelValues(builder)
             if group.UpdateExpansionVisuals then
                 group:UpdateExpansionVisuals()
             end
+            if group.UpdateState then
+                group:UpdateState()
+            end
         end
     end
 end
@@ -781,8 +762,10 @@ local function CreateSettingsPanel()
     local builder = SettingsBuilder:New("knack", UIParent)
     builder.currentProfile = currentProfile
     builder:AddTitle("knack - Next Assisted Combat", "Configure the next assisted combat spell icon display")
-    builder.profileSpecificControls = { ["Main Icon"] = {}, ["Nameplate Icon"] = {} }
+    builder.profileSpecificControls = { ["Main Icon"] = {}, ["Nameplate Icon"] = {}, ["Cooldown Icons"] = {} }
     
+    local anchorPositions = {"TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT"}
+
     -- GROUP 1: General Settings (Global)
     local globalGroup = builder:BeginGroup()
     builder:AddHeader(globalGroup, "General Settings")
@@ -835,8 +818,69 @@ local function CreateSettingsPanel()
     end)
     table.insert(builder.profileSpecificControls["Nameplate Icon"], cbNameplate)
     
+    local afterNameplateY = configGroup.currentY
+    
+    -- Reset Y for Cooldown Icons option
+    configGroup.currentY = startY
+    
+    local cbEssential, cbUtility
+    local ddEssential, slEssential, ddEssentialAnchor
+    local ddUtility, slUtility, ddUtilityAnchor
+    
+    local function SetControlState(control, enabled)
+        if not control then return end
+        
+        -- Enable/Disable
+        if control.SetEnabled then
+            control:SetEnabled(enabled)
+        elseif control.Enable and control.Disable then
+            if enabled then control:Enable() else control:Disable() end
+        elseif UIDropDownMenu_EnableDropDown and control.InitializeDropdown then
+             if enabled then UIDropDownMenu_EnableDropDown(control) else UIDropDownMenu_DisableDropDown(control) end
+        end
+        
+        -- Label Alpha
+        local alpha = enabled and 1 or 0.5
+        if control.label then 
+            control.label:SetAlpha(alpha) 
+        end
+        if control.Label then 
+            control.Label:SetAlpha(alpha) 
+        elseif control.GetName and _G[control:GetName().."Text"] then 
+            _G[control:GetName().."Text"]:SetAlpha(alpha) 
+        end
+    end
+
+    local function UpdateCooldownState()
+        SetControlState(ddEssential, cbEssential:GetChecked())
+        SetControlState(slEssential, cbEssential:GetChecked())
+        SetControlState(ddEssentialAnchor, cbEssential:GetChecked())
+        
+        SetControlState(ddUtility, cbUtility:GetChecked())
+        SetControlState(slUtility, cbUtility:GetChecked())
+        SetControlState(ddUtilityAnchor, cbUtility:GetChecked())
+    end
+    
+    -- Essential Cooldown Manager Checkbox
+    cbEssential = builder:AddCheckbox(configGroup, "Enable Essential Cooldown Manager hotkeys", "Show hotkeys on Essential Cooldown Manager icons", "cooldownEnableEssential", function(self)
+        SetSetting("EnableEssential", self:GetChecked())
+        if KnackUpdateCooldownManagers then KnackUpdateCooldownManagers() end
+        UpdateCooldownState()
+    end)
+    table.insert(builder.profileSpecificControls["Cooldown Icons"], cbEssential)
+    
+    -- Utility Cooldown Manager Checkbox
+    cbUtility = builder:AddCheckbox(configGroup, "Enable Utility Cooldown Manager hotkeys", "Show hotkeys on Utility Cooldown Manager icons", "cooldownEnableUtility", function(self)
+        SetSetting("EnableUtility", self:GetChecked())
+        if KnackUpdateCooldownManagers then KnackUpdateCooldownManagers() end
+        UpdateCooldownState()
+    end)
+    table.insert(builder.profileSpecificControls["Cooldown Icons"], cbUtility)
+    
+    local afterCooldownY = configGroup.currentY
+    
     -- Continue from the lower Y
-    configGroup.currentY = math.min(afterMainY, configGroup.currentY)
+    configGroup.currentY = math.min(afterMainY, afterNameplateY, afterCooldownY)
     
     local initialRowY = configGroup.currentY
 
@@ -923,7 +967,8 @@ local function CreateSettingsPanel()
     -- Store heights for dynamic resizing
     sizeRow.profileHeights = {
         ["Main Icon"] = math.abs(mainY) + builder.spacing.groupBottom,
-        ["Nameplate Icon"] = math.abs(npY) + builder.spacing.groupBottom
+        ["Nameplate Icon"] = math.abs(npY) + builder.spacing.groupBottom,
+        ["Cooldown Icons"] = 30 -- Collapsed/Hidden height
     }
     
     -- Set initial height based on current profile
@@ -1060,7 +1105,6 @@ local function CreateSettingsPanel()
         fontList = {"Friz Quadrata TT", "Arial Narrow", "Skurri", "Morpheus"}
     end
     
-    local anchorPositions = {"TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT"}
     builder:AddDropdown(hotkeyRow, "Hotkey Position:", anchorPositions, "TOPRIGHT", function(anchor)
         SetSetting("HotkeyAnchor", anchor)
         if KnackUpdateHotkeyPosition then KnackUpdateHotkeyPosition() end
@@ -1129,6 +1173,55 @@ local function CreateSettingsPanel()
     builder:EndSubGroup(timersRow, configGroup)
     table.insert(configGroup.rows, timersRow)
     
+    -- Row 6: Cooldown Manager General Settings (Top Level - No Group Visuals)
+    -- REMOVED: This block was causing layout issues and has been moved to the top-level profile specific controls.
+    -- The checkboxes are now added directly to configGroup in the "Profile Specific Options" section above.
+    
+    -- Helper to create Cooldown Settings Groups
+    local function AddCooldownGroup(typeStr, title)
+        local row = builder:BeginSubGroup(configGroup)
+        builder:AddHeader(row, title)
+        
+        local ddAnchor = builder:AddDropdown(row, typeStr .. " Hotkey Position:", anchorPositions, "TOPRIGHT", function(anchor)
+            SetSetting(typeStr .. "HotkeyAnchor", anchor)
+            if KnackUpdateCooldownManagers then KnackUpdateCooldownManagers() end
+        end, "cooldown" .. typeStr .. "HotkeyAnchor")
+
+        local dd = builder:AddDropdown(row, typeStr .. " Font:", fontList, "Friz Quadrata TT", function(fontName)
+            SetSetting(typeStr .. "Font", fontName)
+            if KnackUpdateCooldownManagers then KnackUpdateCooldownManagers() end
+        end, "cooldown" .. typeStr .. "Font")
+        
+        local sl = builder:AddSlider(row, "Knack" .. typeStr .. "FontSizeSlider", CONSTANTS.SLIDER.HOTKEY_MIN, CONSTANTS.SLIDER.HOTKEY_MAX, 14, 
+            tostring(CONSTANTS.SLIDER.HOTKEY_MIN), tostring(CONSTANTS.SLIDER.HOTKEY_MAX),
+            function(v) return typeStr .. " Font Size: " .. v end,
+            function(v) SetSetting(typeStr .. "FontSize", v) if KnackUpdateCooldownManagers then KnackUpdateCooldownManagers() end end, nil, nil, nil, "cooldown" .. typeStr .. "FontSize")
+        
+        builder:EndSubGroup(row, configGroup)
+        table.insert(configGroup.rows, row)
+        row.visibleProfiles = {"Cooldown Icons"}
+        
+        return row, dd, sl, ddAnchor
+    end
+
+    -- Row 7: Essential Settings
+    local cooldownEssentialRow
+    local ddEssentialAnchor
+    cooldownEssentialRow, ddEssential, slEssential, ddEssentialAnchor = AddCooldownGroup("Essential", "Essential Cooldown Settings")
+
+    -- Row 8: Utility Settings
+    local cooldownUtilityRow
+    local ddUtilityAnchor
+    cooldownUtilityRow, ddUtility, slUtility, ddUtilityAnchor = AddCooldownGroup("Utility", "Utility Cooldown Settings")
+    
+    -- Set visibility profiles
+    local mainProfiles = {"Main Icon", "Nameplate Icon"}
+    for i = 1, 5 do
+        if configGroup.rows[i] then
+            configGroup.rows[i].visibleProfiles = mainProfiles
+        end
+    end
+
     builder:EndScrollingGroup(configGroup)
     
     -- Define Reflow function
@@ -1137,20 +1230,33 @@ local function CreateSettingsPanel()
         local profile = builder.currentProfile or "Main Icon"
         
         for _, row in ipairs(configGroup.rows) do
-            local h
-            if row.expanded[profile] then
-                if row == sizeRow then
-                    h = row.profileHeights[profile] or row.fullHeight
-                else
-                    h = row.fullHeight
+            local isVisible = true
+            if row.visibleProfiles then
+                isVisible = false
+                for _, p in ipairs(row.visibleProfiles) do
+                    if p == profile then isVisible = true break end
                 end
-            else
-                h = 30 -- Collapsed height
             end
-            row:SetHeight(h)
             
-            row:SetPoint("TOPLEFT", configGroup, "TOPLEFT", builder.spacing.groupLeft, currentY)
-            currentY = currentY - h - builder.spacing.item
+            if isVisible then
+                row:Show()
+                local h
+                if row.expanded[profile] then
+                    if row == sizeRow then
+                        h = row.profileHeights[profile] or row.fullHeight
+                    else
+                        h = row.fullHeight
+                    end
+                else
+                    h = 30 -- Collapsed height
+                end
+                row:SetHeight(h)
+                
+                row:SetPoint("TOPLEFT", configGroup, "TOPLEFT", builder.spacing.groupLeft, currentY)
+                currentY = currentY - h - builder.spacing.item
+            else
+                row:Hide()
+            end
         end
         
         local totalHeight = math.abs(currentY) + builder.spacing.groupBottom

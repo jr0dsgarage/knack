@@ -139,7 +139,7 @@ function BindingUtils.GetFontPath(fontName)
     return CONSTANTS.FONT.DEFAULT_PATH
 end
 
--- Main Display Object
+-- Main Icon Object
 local KnackDisplay = {}
 KnackDisplay.__index = KnackDisplay
 
@@ -631,12 +631,124 @@ local Knack = {
     lastScan = 0
 }
 
+function Knack:UpdateCooldownManagerIcons(frame, managerName)
+    if not frame then return end
+    
+    -- Determine settings based on managerName
+    local isEssential = (managerName == "EssentialCooldownViewer")
+    local isUtility = (managerName == "UtilityCooldownViewer")
+    
+    local enabled = false
+    local fontName = "Friz Quadrata TT"
+    local fontSize = 14
+    local hotkeyAnchor = "TOPRIGHT"
+    
+    if KnackDB and KnackDB.settings then
+        if isEssential then
+            enabled = KnackDB.settings.cooldownEnableEssential
+            fontName = KnackDB.settings.cooldownEssentialFont
+            fontSize = KnackDB.settings.cooldownEssentialFontSize
+            hotkeyAnchor = KnackDB.settings.cooldownEssentialHotkeyAnchor or "TOPRIGHT"
+        elseif isUtility then
+            enabled = KnackDB.settings.cooldownEnableUtility
+            fontName = KnackDB.settings.cooldownUtilityFont
+            fontSize = KnackDB.settings.cooldownUtilityFontSize
+            hotkeyAnchor = KnackDB.settings.cooldownUtilityHotkeyAnchor or "TOPRIGHT"
+        end
+    end
+    
+    -- Default to enabled if settings not yet initialized (shouldn't happen but safe fallback)
+    if KnackDB and not KnackDB.settings then enabled = true end
+
+    -- print("[Knack] Updating icons for frame:", frame:GetName())
+    local children = { frame:GetChildren() }
+    -- print("[Knack] Found " .. #children .. " children")
+
+    for i, child in ipairs(children) do
+        local spellID = child.spellID
+        if not spellID and child.GetSpellID then
+            spellID = child:GetSpellID()
+        end
+
+        -- print("[Knack] Child " .. i .. " SpellID: " .. tostring(spellID))
+
+        if spellID then
+            if not child.hotkeyText then
+                child.hotkeyText = child:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+                child.hotkeyText:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, 0)
+                child.hotkeyText:SetShadowColor(0, 0, 0, 1)
+                child.hotkeyText:SetShadowOffset(1, -1)
+            end
+            
+            if enabled then
+                local hotkey = BindingUtils.GetHotkeyInfo(spellID)
+                -- print("[Knack] Hotkey for " .. spellID .. ": " .. tostring(hotkey))
+                child.hotkeyText:SetText(hotkey)
+                
+                local fontPath = BindingUtils.GetFontPath(fontName)
+                local size = fontSize or KnackDefaultSettings.hotkeySize
+                child.hotkeyText:SetFont(fontPath, size, "OUTLINE")
+                
+                local color = CONSTANTS.FONT.COLOR_IN_RANGE
+                child.hotkeyText:SetTextColor(color.r, color.g, color.b, color.a)
+                
+                -- Update Anchor
+                child.hotkeyText:ClearAllPoints()
+                child.hotkeyText:SetPoint(hotkeyAnchor, child, hotkeyAnchor, CONSTANTS.FONT.OFFSET, CONSTANTS.FONT.OFFSET)
+                
+                if hotkeyAnchor:find("LEFT") then
+                    child.hotkeyText:SetJustifyH("LEFT")
+                elseif hotkeyAnchor:find("RIGHT") then
+                    child.hotkeyText:SetJustifyH("RIGHT")
+                else
+                    child.hotkeyText:SetJustifyH("CENTER")
+                end
+                
+                child.hotkeyText:Show()
+            else
+                child.hotkeyText:Hide()
+            end
+        end
+    end
+end
+
+function Knack:SetupCooldownManagers()
+    local managers = { "EssentialCooldownViewer", "UtilityCooldownViewer" }
+    
+    for _, name in ipairs(managers) do
+        local frame = _G[name]
+        if frame then
+            print("[Knack] Found manager frame: " .. name)
+            if frame.Update then
+                hooksecurefunc(frame, "Update", function(self)
+                    -- print("[Knack] Hooked Update for " .. name)
+                    Knack:UpdateCooldownManagerIcons(self, name)
+                end)
+            else
+                print("[Knack] No Update method for " .. name)
+            end
+            
+            if frame.HookScript then
+                frame:HookScript("OnShow", function(self)
+                    -- print("[Knack] Hooked OnShow for " .. name)
+                    Knack:UpdateCooldownManagerIcons(self, name)
+                end)
+            end
+            
+            Knack:UpdateCooldownManagerIcons(frame, name)
+        else
+            -- print("[Knack] Could not find manager frame: " .. name)
+        end
+    end
+end
+
 function Knack:Initialize()
     KnackDB = KnackDB or { point = "CENTER", relativePoint = "CENTER", xOfs = 0, yOfs = 0, settings = {} }
     self.display = KnackDisplay:New()
     
     self:SetupEvents()
     self:SetupSlashCommands()
+    self:SetupCooldownManagers()
     self:StartScanning()
 end
 
@@ -666,6 +778,7 @@ function Knack:SetupEvents()
             self:OnLoad()
         elseif event == "PLAYER_LOGIN" then
             self.display:ApplyPosition()
+            self:SetupCooldownManagers()
         elseif event == "PLAYER_TARGET_CHANGED" then
             self:Update()
             self.display:UpdateNameplateAttachment()
@@ -788,5 +901,15 @@ end
 function KnackUpdateNameplateBorder()
     if Knack.display then
         Knack.display:UpdateNameplateBorder()
+    end
+end
+
+function KnackUpdateCooldownManagers()
+    local managers = { "EssentialCooldownViewer", "UtilityCooldownViewer" }
+    for _, name in ipairs(managers) do
+        local frame = _G[name]
+        if frame then
+            Knack:UpdateCooldownManagerIcons(frame, name)
+        end
     end
 end
