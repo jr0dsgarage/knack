@@ -6,7 +6,8 @@ local KnackDisplay = ns.KnackDisplay
 -- Core Logic
 local Knack = {
     display = nil,
-    lastScan = 0
+    lastScan = 0,
+    cooldownUpdateTicker = nil
 }
 
 function Knack:UpdateCooldownManagerIcons(frame, managerName)
@@ -77,6 +78,7 @@ function Knack:UpdateCooldownManagerIcons(frame, managerName)
                     child.hotkeyText:SetJustifyH("CENTER")
                 end
                 
+                child.hotkeyText:Hide()
                 child.hotkeyText:Show()
             else
                 child.hotkeyText:Hide()
@@ -106,6 +108,31 @@ function Knack:SetupCooldownManagers()
             Knack:UpdateCooldownManagerIcons(frame, name)
         end
     end
+    
+    -- Start periodic update checker for when settings panel is open
+    self:StartCooldownUpdateTicker()
+end
+
+function Knack:StartCooldownUpdateTicker()
+    if self.cooldownUpdateTicker then
+        self.cooldownUpdateTicker:Cancel()
+    end
+    
+    -- Create a ticker that runs every 0.1 seconds
+    self.cooldownUpdateTicker = C_Timer.NewTicker(0.1, function()
+        -- Check if the Cooldown Settings panel is open
+        local settingsPanel = _G["CooldownViewerSettings"]
+        if settingsPanel and settingsPanel:IsVisible() then
+            -- Update cooldown managers
+            local managers = { "EssentialCooldownViewer", "UtilityCooldownViewer" }
+            for _, name in ipairs(managers) do
+                local frame = _G[name]
+                if frame then
+                    Knack:UpdateCooldownManagerIcons(frame, name)
+                end
+            end
+        end
+    end)
 end
 
 function Knack:Initialize()
@@ -279,3 +306,5 @@ function KnackUpdateCooldownManagers()
         end
     end
 end
+
+ns.KnackUpdateCooldownManagers = KnackUpdateCooldownManagers
