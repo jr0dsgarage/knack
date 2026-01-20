@@ -233,10 +233,21 @@ end
 function Knack:ShouldDisplay()
     if not KnackDB.settings.enabled then return false end
     
-    if KnackDB.settings.onlyWithEnemyTarget then
-        if not UnitExists("target") or not UnitCanAttack("player", "target") or UnitIsDead("target") then
+    if KnackDB.settings.onlyShowWithTarget then
+        if not UnitExists("target") or UnitIsDead("target") then
             return false
         end
+        
+        local isEnemy = UnitCanAttack("player", "target")
+        local isFriend = UnitIsFriend("player", "target")
+        
+        if isEnemy and KnackDB.settings.showTargetEnemy then
+            return true
+        elseif isFriend and KnackDB.settings.showTargetFriendly then
+            return true
+        end
+        
+        return false
     end
     
     return C_AssistedCombat and C_AssistedCombat.GetNextCastSpell

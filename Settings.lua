@@ -33,7 +33,9 @@ local CONSTANTS = {
 -- Global Defaults
 KnackDefaultSettings = {
     enabled = true, 
-    onlyWithEnemyTarget = false, 
+    onlyShowWithTarget = false,
+    showTargetEnemy = true,
+    showTargetFriendly = false,
     attachToNameplate = false,
     nameplateAnchor = "TOP",
     nameplateIconSize = 32,
@@ -107,7 +109,9 @@ local profiles = {
 
 local globalKeys = {
     ["enabled"] = true,
-    ["onlyWithEnemyTarget"] = true,
+    ["onlyShowWithTarget"] = true,
+    ["showTargetEnemy"] = true,
+    ["showTargetFriendly"] = true,
     ["attachToNameplate"] = true,
     ["cooldownEnableEssential"] = true,
     ["cooldownEssentialFont"] = true,
@@ -800,11 +804,49 @@ local function CreateSettingsPanel()
     -- Profile Specific Options (Overlapping)
     local startY = configGroup.currentY
     
-    -- Main Icon Option: Only show when an Enemy is targeted
-    local cbMain = builder:AddCheckbox(configGroup, "Only show when an Enemy is targeted", "Only display the spell icon when you have an enemy targeted", "onlyWithEnemyTarget", function(self)
-        KnackDB.settings.onlyWithEnemyTarget = self:GetChecked()
+    -- Main Icon Option: Only Show when Target is selected
+    local cbEnemy, cbFriendly
+    
+    local function UpdateTargetCheckboxes()
+        local enabled = KnackDB.settings.onlyShowWithTarget
+        if cbEnemy then
+             if enabled then 
+                cbEnemy:Enable() 
+                if cbEnemy.Text then cbEnemy.Text:SetTextColor(1, 0.82, 0) end
+             else 
+                cbEnemy:Disable() 
+                if cbEnemy.Text then cbEnemy.Text:SetTextColor(0.5, 0.5, 0.5) end
+             end
+        end
+        if cbFriendly then
+             if enabled then 
+                cbFriendly:Enable() 
+                if cbFriendly.Text then cbFriendly.Text:SetTextColor(1, 0.82, 0) end
+             else 
+                cbFriendly:Disable() 
+                if cbFriendly.Text then cbFriendly.Text:SetTextColor(0.5, 0.5, 0.5) end
+             end
+        end
+    end
+
+    local cbTarget = builder:AddCheckbox(configGroup, "Only Show when Target is selected", "Only display the spell icon when you have a valid target selected", "onlyShowWithTarget", function(self)
+        KnackDB.settings.onlyShowWithTarget = self:GetChecked()
+        UpdateTargetCheckboxes()
     end)
-    table.insert(builder.profileSpecificControls["Main Icon"], cbMain)
+    table.insert(builder.profileSpecificControls["Main Icon"], cbTarget)
+
+    cbEnemy = builder:AddCheckbox(configGroup, "Enemy Target", "Show when targeting an enemy", "showTargetEnemy", function(self)
+        KnackDB.settings.showTargetEnemy = self:GetChecked()
+    end, 20)
+    table.insert(builder.profileSpecificControls["Main Icon"], cbEnemy)
+    
+    cbFriendly = builder:AddCheckbox(configGroup, "Friendly Target", "Show when targeting a friendly unit", "showTargetFriendly", function(self)
+        KnackDB.settings.showTargetFriendly = self:GetChecked()
+    end, 20)
+    table.insert(builder.profileSpecificControls["Main Icon"], cbFriendly)
+    
+    -- Initialize state
+    UpdateTargetCheckboxes()
     
     local afterMainY = configGroup.currentY
     
