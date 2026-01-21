@@ -42,15 +42,25 @@ function BindingUtils.FormatBinding(binding)
 end
 
 function BindingUtils.GetHotkeyInfo(spellID)
+    if not spellID then return "", true end
     local slots = C_ActionBar.FindSpellActionButtons(spellID)
-    if not slots or not slots[1] then return "", true end
+    
+    -- Safety check for restricted tables
+    local isSafe, firstSlot = pcall(function() return slots and slots[1] end)
+    if not isSafe or not firstSlot then return "", true end
     
     local bindings = {}
-    for i = 1, math.min(CONSTANTS.ACTION_BAR.MAX_BINDINGS, #slots) do
-        local bindingName = BindingUtils.GetBindingNameForSlot(slots[i])
-        local binding = bindingName and BindingUtils.SelectBinding(GetBindingKey(bindingName))
-        if binding then
-            table.insert(bindings, BindingUtils.FormatBinding(binding))
+    local safeLen, len = pcall(function() return #slots end)
+    if not safeLen then return "", true end
+
+    for i = 1, math.min(CONSTANTS.ACTION_BAR.MAX_BINDINGS, len) do
+        local slotSafe, slotVal = pcall(function() return slots[i] end)
+        if slotSafe and slotVal then
+            local bindingName = BindingUtils.GetBindingNameForSlot(slotVal)
+            local binding = bindingName and BindingUtils.SelectBinding(GetBindingKey(bindingName))
+            if binding then
+                table.insert(bindings, BindingUtils.FormatBinding(binding))
+            end
         end
     end
     
