@@ -187,7 +187,7 @@ function SettingsBuilder:BeginScrollingGroup()
     local outer = CreateFrame("Frame", nil, self.container, "BackdropTemplate")
     
     -- Anchor to the last element (tabs) and fill down to the bottom of the panel
-    outer:SetPoint("TOPLEFT", self.lastAnchor, "BOTTOMLEFT", 0, 10) -- Small gap
+    outer:SetPoint("TOPLEFT", self.lastAnchor, "BOTTOMLEFT", 0, -2) -- Small gap
     outer:SetPoint("BOTTOMRIGHT", self.container, "BOTTOMRIGHT", -CONSTANTS.PADDING_LARGE, CONSTANTS.PADDING_LARGE)
     
     outer:SetBackdrop({
@@ -196,7 +196,7 @@ function SettingsBuilder:BeginScrollingGroup()
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    outer:SetBackdropColor(0.1, 0.1, 0.1, 0.4)
+    outer:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
     outer:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
     
     local scrollFrame = CreateFrame("ScrollFrame", nil, outer, "UIPanelScrollFrameTemplate")
