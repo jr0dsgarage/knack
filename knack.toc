@@ -1,8 +1,9 @@
-## Interface: 120000
+## Interface: 120005
 ## Title: knack
 ## Notes: Displays the next assisted highlight spell with its hotkey
 ## Author: j__r0d
 ## Version: 1.0.0
+## Category-enUS: j__r0d's garage
 ## SavedVariables: KnackDB
 ## OptionalDeps: LibSharedMedia-3.0, next
 
